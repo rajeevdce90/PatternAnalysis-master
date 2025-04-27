@@ -187,6 +187,11 @@
                             </li>
                         </ul>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.path == '/nightwatch' %}active{% endif %}" href="{{ url_for('nightwatch') }}">
+                            <i class="bi bi-bell"></i> Nightwatch
+                        </a>
+                    </li>
                 </ul>
                 
                 <ul class="navbar-nav ms-auto">

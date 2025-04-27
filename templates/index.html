@@ -46,16 +46,39 @@
             <div class="tab-pane fade show active" id="upload-pane" role="tabpanel" aria-labelledby="upload-tab">
                 <h4>Upload Log File</h4>
                 <p>Upload your log file (CSV or JSON). The analysis workflow will start automatically.</p>
-                <!-- Existing file upload form and subsequent workflow steps -->
-    <div class="workflow-container">
-        <div class="workflow-step active" id="step1">
-            <div class="step-content">
+                <div class="workflow-container">
+                    <div class="workflow-step active" id="step1">
+                        <div class="step-content">
                             <form id="uploadForm" enctype="multipart/form-data">
-                                <input type="file" id="logFile" class="form-control mb-3" accept=".csv, .json">
+                                <div class="mb-3">
+                                    <label for="targetIndex" class="form-label">Target Index</label>
+                                    <div class="input-group">
+                                        <select class="form-select" id="targetIndex" required>
+                                            <option value="">Select an index...</option>
+                                        </select>
+                                        <button class="btn btn-outline-secondary" type="button" id="refreshIndices">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                        <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
+                                            <i class="bi bi-plus-lg"></i> New Index
+                                        </button>
+                                    </div>
+                                    <div class="form-text">Choose the index where the data will be stored</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="uploadDatatype" class="form-label">Data Type</label>
+                                    <input type="text" class="form-control" id="uploadDatatype" required 
+                                           placeholder="e.g., apache_logs, system_logs, application_logs">
+                                    <div class="form-text">A unique identifier for this type of data</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="logFile" class="form-label">Log File</label>
+                                    <input type="file" id="logFile" class="form-control" accept=".csv, .json" required>
+                                </div>
                                 <button type="submit" class="btn btn-primary">Upload and Analyze</button>
                             </form>
                             <div id="uploadStatus" class="alert alert-info mt-3" style="display: none;"></div>
-                    </div>
+                        </div>
                     </div>
                     <div class="workflow-step" id="step2" style="display: none;">
                         <div class="d-flex align-items-center mb-3">
@@ -104,8 +127,19 @@
                 <p>Set up a collector to periodically fetch data from a REST API endpoint.</p>
                 <form id="restCollectorForm">
                     <div class="mb-3">
-                        <label for="apiUrl" class="form-label">API Endpoint URL</label>
-                        <input type="url" class="form-control" id="apiUrl" placeholder="https://api.example.com/data" required>
+                        <label for="restTargetIndex" class="form-label">Target Index</label>
+                        <div class="input-group">
+                            <select class="form-select" id="restTargetIndex" required>
+                                <option value="">Select an index...</option>
+                            </select>
+                            <button class="btn btn-outline-secondary" type="button" onclick="loadIndices('restTargetIndex')">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                            <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
+                                <i class="bi bi-plus-lg"></i> New Index
+                            </button>
+                        </div>
+                        <div class="form-text">Choose the index where the data will be stored</div>
                     </div>
                      <div class="row">
                         <div class="col-md-6 mb-3">
@@ -129,6 +163,12 @@
                         <label for="apiBody" class="form-label">Request Body (JSON Format, Optional)</label>
                         <textarea class="form-control" id="apiBody" rows="4" placeholder='{ "parameter": "value" }'></textarea>
             </div>
+                    <div class="mb-3">
+                        <label for="restDatatype" class="form-label">Data Type</label>
+                        <input type="text" class="form-control" id="restDatatype" required 
+                               placeholder="e.g., api_metrics, external_events">
+                        <div class="form-text">A unique identifier for this type of data</div>
+                    </div>
                      <!-- Future: Authentication options (e.g., Basic, Bearer Token) -->
                     <button type="button" class="btn btn-primary" id="startCollectorBtn">
                         <i class="bi bi-play-circle"></i> Start Collector
@@ -144,6 +184,21 @@
                 <form id="syslogForm">
                     <div class="row">
                         <div class="col-md-6 mb-3">
+                            <label for="syslogTargetIndex" class="form-label">Target Index</label>
+                            <div class="input-group">
+                                <select class="form-select" id="syslogTargetIndex" required>
+                                    <option value="">Select an index...</option>
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" onclick="loadIndices('syslogTargetIndex')">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
+                                    <i class="bi bi-plus-lg"></i> New Index
+                                </button>
+                            </div>
+                            <div class="form-text">Choose the index where the data will be stored</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
                             <label for="syslogPort" class="form-label">Listen Port</label>
                             <input type="number" class="form-control" id="syslogPort" value="514" min="1" max="65535" required>
                             <small class="text-muted">Standard Syslog port is 514.</small>
@@ -156,6 +211,12 @@
                             </select>
                              <small class="text-muted">Ensure your devices send logs using this protocol.</small>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="syslogDatatype" class="form-label">Data Type</label>
+                        <input type="text" class="form-control" id="syslogDatatype" required 
+                               placeholder="e.g., syslog_events, network_logs">
+                        <div class="form-text">A unique identifier for this type of data</div>
                     </div>
                     <!-- Future: Options for TLS, message format parsing -->
                     <button type="button" class="btn btn-primary" id="startSyslogBtn">
@@ -172,6 +233,21 @@
                 <form id="hecForm">
                     <div class="row">
                         <div class="col-md-6 mb-3">
+                            <label for="hecTargetIndex" class="form-label">Target Index</label>
+                            <div class="input-group">
+                                <select class="form-select" id="hecTargetIndex" required>
+                                    <option value="">Select an index...</option>
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" onclick="loadIndices('hecTargetIndex')">
+                                    <i class="bi bi-arrow-clockwise"></i>
+                                </button>
+                                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
+                                    <i class="bi bi-plus-lg"></i> New Index
+                                </button>
+                            </div>
+                            <div class="form-text">Choose the index where the data will be stored</div>
+                        </div>
+                        <div class="col-md-6 mb-3">
                             <label for="hecPort" class="form-label">Listen Port</label>
                             <input type="number" class="form-control" id="hecPort" value="8088" min="1" max="65535" required>
                             <small class="text-muted">Standard HEC port is 8088.</small>
@@ -184,6 +260,12 @@
                                 </label>
                             </div>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="hecDatatype" class="form-label">Data Type</label>
+                        <input type="text" class="form-control" id="hecDatatype" required 
+                               placeholder="e.g., application_metrics, custom_events">
+                        <div class="form-text">A unique identifier for this type of data</div>
                     </div>
                     <div class="mb-3">
                         <label for="hecToken" class="form-label">HEC Token</label>
@@ -208,9 +290,19 @@
                 <p>Configure a connection to pull data directly from a database.</p>
                 <form id="dbConnectionForm">
                      <div class="mb-3">
-                        <label for="dbConnectionName" class="form-label">Connection Name</label>
-                        <input type="text" class="form-control" id="dbConnectionName" placeholder="My Production DB" required>
-                         <small class="text-muted">A friendly name for this connection.</small>
+                        <label for="dbTargetIndex" class="form-label">Target Index</label>
+                        <div class="input-group">
+                            <select class="form-select" id="dbTargetIndex" required>
+                                <option value="">Select an index...</option>
+                            </select>
+                            <button class="btn btn-outline-secondary" type="button" onclick="loadIndices('dbTargetIndex')">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                            <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
+                                <i class="bi bi-plus-lg"></i> New Index
+                            </button>
+                        </div>
+                        <div class="form-text">Choose the index where the data will be stored</div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -249,6 +341,12 @@
                             <input type="password" class="form-control" id="dbPassword" required>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label for="dbDatatype" class="form-label">Data Type</label>
+                        <input type="text" class="form-control" id="dbDatatype" required 
+                               placeholder="e.g., database_logs, sql_events">
+                        <div class="form-text">A unique identifier for this type of data</div>
+                    </div>
                      <!-- Future: SSL options, connection pooling -->
                      <button type="button" class="btn btn-secondary" id="testDbConnectionBtn">
                         <i class="bi bi-plug"></i> Test Connection
@@ -268,6 +366,39 @@
         </div>
     </div>
     </div>
+
+<!-- New Index Modal -->
+<div class="modal fade" id="newIndexModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create New Index</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="newIndexForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="indexName" class="form-label">Index Name</label>
+                        <input type="text" class="form-control" id="indexName" required 
+                               pattern="[a-z0-9-]+" placeholder="lowercase-letters-numbers-only">
+                        <div class="form-text">Use lowercase letters, numbers, and hyphens only</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="indexSettings" class="form-label">Index Settings (Optional)</label>
+                        <textarea class="form-control" id="indexSettings" rows="4" 
+                                placeholder='{"settings": {"number_of_shards": 1, "number_of_replicas": 1}}'></textarea>
+                        <div class="form-text">JSON format. Leave empty for default settings</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Index</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -282,10 +413,61 @@ let itemsPerPage = 10;
 let patterns = [];
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Load indices for all input types on page load
+    loadIndices('targetIndex');
+    loadIndices('restTargetIndex');
+    loadIndices('syslogTargetIndex');
+    loadIndices('hecTargetIndex');
+    loadIndices('dbTargetIndex');
+    
     // File Upload Form submission handler
     document.getElementById('uploadForm').addEventListener('submit', function(e) {
         e.preventDefault();
         uploadFile();
+    });
+    
+    // REST API Collector form handler
+    document.getElementById('restCollectorForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const targetIndex = document.getElementById('restTargetIndex').value;
+        if (!targetIndex) {
+            showToast('Please select a target index', 'error');
+            return;
+        }
+        startRestCollector(targetIndex);
+    });
+    
+    // Syslog form handler
+    document.getElementById('syslogForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const targetIndex = document.getElementById('syslogTargetIndex').value;
+        if (!targetIndex) {
+            showToast('Please select a target index', 'error');
+            return;
+        }
+        startSyslogListener(targetIndex);
+    });
+    
+    // HEC form handler
+    document.getElementById('hecForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const targetIndex = document.getElementById('hecTargetIndex').value;
+        if (!targetIndex) {
+            showToast('Please select a target index', 'error');
+            return;
+        }
+        startHecListener(targetIndex);
+    });
+    
+    // Database Connection form handler
+    document.getElementById('dbConnectionForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const targetIndex = document.getElementById('dbTargetIndex').value;
+        if (!targetIndex) {
+            showToast('Please select a target index', 'error');
+            return;
+        }
+        saveDbConnection(targetIndex);
     });
     
     // Generate patterns button
@@ -328,6 +510,33 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('saveDbConnectionBtn').addEventListener('click', function() {
         saveDbConnection();
     });
+
+    // Refresh indices button
+    document.getElementById('refreshIndices').addEventListener('click', loadIndices);
+    
+    // New index form submission
+    document.getElementById('newIndexForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const name = document.getElementById('indexName').value;
+        let settings = {};
+        
+        const settingsText = document.getElementById('indexSettings').value;
+        if (settingsText.trim()) {
+            try {
+                settings = JSON.parse(settingsText);
+            } catch (error) {
+                showToast('Invalid JSON in settings', 'error');
+                return;
+            }
+        }
+        
+        const success = await createIndex(name, settings);
+        if (success) {
+            bootstrap.Modal.getInstance(document.getElementById('newIndexModal')).hide();
+            document.getElementById('newIndexForm').reset();
+        }
+    });
 });
 
 // --- File Upload Workflow Functions --- 
@@ -336,14 +545,21 @@ function uploadFile() {
             const fileInput = document.getElementById('logFile');
             const file = fileInput.files[0];
     const uploadStatusDiv = document.getElementById('uploadStatus');
+    const datatype = document.getElementById('uploadDatatype').value;
     
             if (!file) {
         showMessage('Please select a file first', 'danger', uploadStatusDiv);
                 return;
             }
 
+            if (!datatype) {
+                showMessage('Please specify a data type', 'danger', uploadStatusDiv);
+                return;
+            }
+
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('datatype', datatype);
 
     showMessage('Uploading and processing file...', 'info', uploadStatusDiv);
     // Reset subsequent steps
@@ -536,16 +752,17 @@ function displayPatterns(patternsData) {
 
 // --- REST API Collector Functions --- 
 
-function startRestCollector() {
+function startRestCollector(targetIndex) {
     const apiUrl = document.getElementById('apiUrl').value;
     const apiMethod = document.getElementById('apiMethod').value;
     const pollInterval = document.getElementById('pollInterval').value;
     const apiHeaders = document.getElementById('apiHeaders').value;
     const apiBody = document.getElementById('apiBody').value;
+    const datatype = document.getElementById('restDatatype').value;
     const collectorStatusDiv = document.getElementById('collectorStatus');
 
-    if (!apiUrl || !pollInterval) {
-        showMessage('API URL and Polling Interval are required.', 'warning', collectorStatusDiv);
+    if (!apiUrl || !pollInterval || !datatype) {
+        showMessage('API URL, Polling Interval, and Data Type are required.', 'warning', collectorStatusDiv);
         return;
     }
 
@@ -572,7 +789,9 @@ function startRestCollector() {
         method: apiMethod,
         interval: parseInt(pollInterval, 10),
         headers: headers,
-        body: body
+        body: body,
+        target_index: targetIndex,
+        datatype: datatype
     };
 
     showMessage('Starting REST API collector...', 'info', collectorStatusDiv);
@@ -610,19 +829,22 @@ function startRestCollector() {
 }
 
 // --- Syslog Input Functions --- 
-function startSyslogListener() {
+function startSyslogListener(targetIndex) {
     const port = document.getElementById('syslogPort').value;
     const protocol = document.getElementById('syslogProtocol').value;
+    const datatype = document.getElementById('syslogDatatype').value;
     const syslogStatusDiv = document.getElementById('syslogStatus');
 
-    if (!port) {
-        showMessage('Syslog Port is required.', 'warning', syslogStatusDiv);
+    if (!port || !datatype) {
+        showMessage('Syslog Port and Data Type are required.', 'warning', syslogStatusDiv);
         return;
     }
 
     const syslogConfig = {
         port: parseInt(port, 10),
-        protocol: protocol
+        protocol: protocol,
+        target_index: targetIndex,
+        datatype: datatype
     };
 
     showMessage('Starting Syslog listener...', 'info', syslogStatusDiv);
@@ -652,14 +874,15 @@ function startSyslogListener() {
 }
 
 // --- HEC Input Functions --- 
-function startHecListener() {
+function startHecListener(targetIndex) {
     const port = document.getElementById('hecPort').value;
     const useHttps = document.getElementById('hecUseHttps').checked;
     const token = document.getElementById('hecToken').value;
+    const datatype = document.getElementById('hecDatatype').value;
     const hecStatusDiv = document.getElementById('hecStatus');
 
-    if (!port) {
-        showMessage('HEC Port is required.', 'warning', hecStatusDiv);
+    if (!port || !datatype) {
+        showMessage('HEC Port and Data Type are required.', 'warning', hecStatusDiv);
         return;
     }
      if (!token) {
@@ -670,7 +893,9 @@ function startHecListener() {
     const hecConfig = {
         port: parseInt(port, 10),
         use_https: useHttps,
-        token: token // Token should ideally be managed/validated server-side
+        token: token,
+        target_index: targetIndex,
+        datatype: datatype
     };
 
     showMessage('Starting HEC listener...', 'info', hecStatusDiv);
@@ -740,16 +965,17 @@ function testDbConnection() {
     // fetch('/api/connections/db/test', { method: 'POST', body: JSON.stringify(dbConfig) ... });
 }
 
-function saveDbConnection() {
+function saveDbConnection(targetIndex) {
     const dbConfig = getDbFormData();
+    if (!dbConfig) return;
+    
+    dbConfig.target_index = targetIndex;
     const dbStatusDiv = document.getElementById('dbConnectionStatus');
-
-    if (!dbConfig) return; // Validation failed
-
+    
     showMessage('Saving database connection...', 'info', dbStatusDiv);
 
     // TODO: Replace with actual API call to backend to save connection
-    console.log("DB Save Config:", dbConfig);
+    console.log("DB Config:", dbConfig);
     // Simulating success/failure
     setTimeout(() => {
          const success = Math.random() > 0.3; 
@@ -773,10 +999,11 @@ function getDbFormData() {
      const dbName = document.getElementById('dbName').value;
      const username = document.getElementById('dbUsername').value;
      const password = document.getElementById('dbPassword').value;
+     const datatype = document.getElementById('dbDatatype').value;
      const dbStatusDiv = document.getElementById('dbConnectionStatus');
 
-    if (!name || !type || !host || !port || !dbName || !username || !password) {
-        showMessage('All database connection fields are required.', 'warning', dbStatusDiv);
+    if (!name || !type || !host || !port || !dbName || !username || !password || !datatype) {
+        showMessage('All database connection fields and Data Type are required.', 'warning', dbStatusDiv);
         return null;
     }
     
@@ -787,12 +1014,83 @@ function getDbFormData() {
         port: parseInt(port, 10),
         database: dbName,
         username: username,
-        password: password // Note: Sending password, ensure HTTPS and secure backend handling
+        password: password,
+        datatype: datatype
     };
 }
 
 // Placeholder for loading saved connections (future enhancement)
 // function loadSavedDbConnections() { ... }
+
+// Function to load available indices
+async function loadIndices(selectId) {
+    try {
+        const response = await fetch('/api/admin/indices');
+        if (!response.ok) throw new Error('Failed to fetch indices');
+        
+        const indices = await response.json();
+        const select = document.getElementById(selectId);
+        select.innerHTML = '<option value="">Select an index...</option>';
+        
+        indices.forEach(index => {
+            const option = document.createElement('option');
+            option.value = index.name;
+            option.textContent = index.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading indices:', error);
+        showToast('Failed to load indices', 'error');
+    }
+}
+
+// Function to create a new index
+async function createIndex(name, settings = {}) {
+    try {
+        const response = await fetch('/api/admin/indices', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                settings: settings
+            })
+        });
+        
+        if (!response.ok) throw new Error('Failed to create index');
+        
+        showToast('Index created successfully', 'success');
+        loadIndices(); // Refresh the indices list
+        return true;
+    } catch (error) {
+        console.error('Error creating index:', error);
+        showToast('Failed to create index: ' + error.message, 'error');
+        return false;
+    }
+}
+
+// Function to show toast notifications
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    toast.addEventListener('hidden.bs.toast', () => toast.remove());
+}
 
     </script>
 {% endblock %} 

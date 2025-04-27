@@ -59,8 +59,8 @@ regex_parser = RegexParser()
 # Import Alert after app initialization to avoid circular dependencies
 from models.alert import Alert
 
-# Start alert checker
-alert_checker.start()
+# Temporarily disable alert checker to test stability
+# alert_checker.start()
 
 # Directory for saved queries
 SAVED_QUERIES_DIR = 'saved_queries'
@@ -562,6 +562,11 @@ def upload_file():
         if file.filename == '':
             return jsonify({'error': 'No selected file'}), 400
             
+        # Get target index
+        target_index = request.form.get('index')
+        if not target_index:
+            return jsonify({'error': 'Target index is required'}), 400
+            
         # Save the file
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_data.csv')
         file.save(file_path)
@@ -580,12 +585,16 @@ def upload_file():
         # Convert first 1000 rows to list of dictionaries for events
         events = df.head(1000).replace({pd.NaT: None}).to_dict('records')
         
+        # Store target index in session for later use
+        session['target_index'] = target_index
+        
         return jsonify({
             'success': True,
             'columns': columns,
             'events': events,
             'total_events': len(df),
-            'valid_events': df.notna().all(axis=1).sum()
+            'valid_events': df.notna().all(axis=1).sum(),
+            'target_index': target_index
         })
         
     except Exception as e:
@@ -1525,6 +1534,8 @@ def get_triggered_alerts():
         alert_id = request.args.get('alert_id')
         from_date = request.args.get('from_date')
         to_date = request.args.get('to_date')
+        severity = request.args.get('severity', 'all')
+        status = request.args.get('status', 'all')
         limit = int(request.args.get('limit', 100))
         
         # Get triggered alerts with filters
@@ -1535,9 +1546,19 @@ def get_triggered_alerts():
             to_date=to_date
         )
         
-        # Add alert details to each triggered alert
-        result = []
+        # Apply additional filters
+        filtered_alerts = []
         for triggered in triggered_alerts:
+            # Skip if severity doesn't match
+            if severity != 'all':
+                alert_severity = 'critical' if triggered.get('value', 0) > triggered.get('threshold', 0) * 1.5 else 'normal'
+                if alert_severity != severity:
+                    continue
+            
+            # Skip if status doesn't match
+            if status != 'all' and triggered.get('status') != status:
+                continue
+            
             # Get the alert that triggered this
             alert = Alert.get_alert_by_id(triggered['alert_id'])
             if not alert:
@@ -1550,9 +1571,9 @@ def get_triggered_alerts():
             query = get_query_by_id(alert.query_id)
             triggered['query_name'] = query.get('name', 'Unknown Query') if query else 'Unknown Query'
             
-            result.append(triggered)
+            filtered_alerts.append(triggered)
         
-        return jsonify(result)
+        return jsonify(filtered_alerts)
     except Exception as e:
         logger.error(f"Error getting triggered alerts: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -1570,7 +1591,7 @@ def get_query_by_id(query_id):
     except:
         return None
 
-@app.route('/api/alert_stats', methods=['GET'])
+@app.route('/api/alert_stats')
 @login_required
 def get_alert_stats():
     try:
@@ -1583,11 +1604,16 @@ def get_alert_stats():
         from_date = (datetime.now() - timedelta(hours=24)).isoformat()
         triggered_alerts = Alert.get_triggered_alerts(from_date=from_date)
         
+        # Count critical alerts (those that exceeded their threshold by a significant amount)
+        critical_count = sum(1 for a in triggered_alerts 
+                           if a.get('value', 0) > a.get('threshold', 0) * 1.5)  # 50% over threshold
+        
         return jsonify({
             'total_alerts': len(alerts),
             'active_alerts': active_count,
             'disabled_alerts': disabled_count,
-            'triggered_last_24h': len(triggered_alerts)
+            'triggered_last_24h': len(triggered_alerts),
+            'critical_alerts': critical_count
         })
     except Exception as e:
         logger.error(f"Error getting alert stats: {str(e)}")
@@ -1879,6 +1905,37 @@ def test_connection_settings():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 # --- End Connection Settings API ---
+
+@app.route('/nightwatch')
+@login_required
+def nightwatch():
+    return render_template('nightwatch.html')
+
+@app.route('/api/alerts/<alert_id>/acknowledge', methods=['POST'])
+@login_required
+def acknowledge_alert(alert_id):
+    try:
+        data = request.json
+        notes = data.get('notes', '')
+        
+        alert = Alert.get_alert_by_id(alert_id)
+        if not alert:
+            return jsonify({'error': 'Alert not found'}), 404
+        
+        # Update alert status
+        success = Alert.update_alert(alert_id, 
+                                   status='acknowledged',
+                                   acknowledged_by=session.get('user_id'),
+                                   acknowledged_at=datetime.now().isoformat(),
+                                   acknowledgment_notes=notes)
+        
+        if not success:
+            return jsonify({'error': 'Failed to acknowledge alert'}), 500
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error acknowledging alert: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(host='localhost', port=5000, debug=True) 
