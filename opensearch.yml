@@ -1,0 +1,15 @@
+cluster.name: "docker-cluster"
+network.host: 0.0.0.0
+
+# Disable security for testing
+plugins.security.disabled: true
+
+# Enable PPL
+plugins.sql.enabled: true
+plugins.ppl.enabled: true
+
+# Discovery settings
+discovery.type: single-node
+
+# Heap size settings
+bootstrap.memory_lock: true 

@@ -1,0 +1,1129 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Search Interface</h2>
+            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#saveQueryModal">
+                <i class="bi bi-save"></i> Save Query
+            </button>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" id="queryTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="tab1-tab" data-bs-toggle="tab" data-bs-target="#tab1" type="button" role="tab" aria-controls="tab1" aria-selected="true">Query 1</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab2-tab" data-bs-toggle="tab" data-bs-target="#tab2" type="button" role="tab" aria-controls="tab2" aria-selected="false">Query 2</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="tab3-tab" data-bs-toggle="tab" data-bs-target="#tab3" type="button" role="tab" aria-controls="tab3" aria-selected="false">Query 3</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="btn btn-sm btn-success" id="addTabBtn" type="button" title="Add new query tab">
+                            <i class="bi bi-plus-lg"></i> New Tab
+                        </button>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <form id="sqlForm" onsubmit="executeQuery(); return false;">
+                    <div class="mb-3">
+                        <div class="tab-content p-3 border border-top-0 rounded-bottom" id="queryTabContent">
+                            <div class="tab-pane fade show active" id="tab1" role="tabpanel" aria-labelledby="tab1-tab">
+                                <div class="row mb-2">
+                                    <div class="col-md-3">
+                                        <label for="queryLanguage1" class="form-label">Query Language:</label>
+                                        <select class="form-select queryLanguage" id="queryLanguage1" data-tab="1" onchange="updateSampleQuery(1); toggleIndexInput(1);">
+                                            <option value="sql" selected>SQL</option>
+                                            <option value="ppl">PPL (Piped Processing Language)</option>
+                                            <option value="dsl">DSL (Elasticsearch Query DSL)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 index-input-container" id="indexContainer1" style="display: none;">
+                                        <label for="indexName1" class="form-label">Index Name:</label>
+                                        <input type="text" class="form-control" id="indexName1" placeholder="Enter index name" value="pa_logs">
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary mt-4 me-2" onclick="loadSampleQuery(1)">
+                                            Load Sample Query
+                                        </button>
+                                    </div>
+                                </div>
+                                <label for="sqlQuery1" class="form-label">Enter Query:</label>
+                                <textarea class="form-control sqlQuery" id="sqlQuery1" data-tab="1" rows="5" required>SELECT * FROM pa_logs LIMIT 10</textarea>
+                                <div id="dslHelpText1" class="alert alert-info mt-2" style="display: none;">
+                                    <strong>DSL Query Format:</strong> Enter a valid JSON object. The index name specified above will be used.
+                                    <pre class="mb-0 mt-2">
+# Simple query to return all documents:
+{
+  "query": { "match_all": {} },
+  "size": 100
+}
+
+# The index name field is NOT needed in your query - it will be automatically added.</pre>
+                                </div>
+                            </div>
+                            
+                            <div class="tab-pane fade" id="tab2" role="tabpanel" aria-labelledby="tab2-tab">
+                                <div class="row mb-2">
+                                    <div class="col-md-3">
+                                        <label for="queryLanguage2" class="form-label">Query Language:</label>
+                                        <select class="form-select queryLanguage" id="queryLanguage2" data-tab="2" onchange="updateSampleQuery(2); toggleIndexInput(2);">
+                                            <option value="sql" selected>SQL</option>
+                                            <option value="ppl">PPL (Piped Processing Language)</option>
+                                            <option value="dsl">DSL (Elasticsearch Query DSL)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 index-input-container" id="indexContainer2" style="display: none;">
+                                        <label for="indexName2" class="form-label">Index Name:</label>
+                                        <input type="text" class="form-control" id="indexName2" placeholder="Enter index name" value="pa_logs">
+                                    </div>
+                                    <div class="col-md-6 text-end">
+                                        <button type="button" class="btn btn-sm btn-outline-secondary mt-4 me-2" onclick="loadSampleQuery(2)">
+                                            Load Sample Query
+                                        </button>
+                                    </div>
+                                </div>
+                                <label for="sqlQuery2" class="form-label">Enter Query:</label>
+                                <textarea class="form-control sqlQuery" id="sqlQuery2" data-tab="2" rows="5" required>SELECT * FROM pa_logs LIMIT 10</textarea>
+                                <div id="dslHelpText2" class="alert alert-info mt-2" style="display: none;">
+                                    <strong>DSL Query Format:</strong> Enter a valid JSON object. The index name specified above will be used.
+                                    <pre class="mb-0 mt-2">
+# Simple query to return all documents:
+{
+  "query": { "match_all": {} },
+  "size": 100
+}
+
+# The index name field is NOT needed in your query - it will be automatically added.</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Execute Query</button>
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#saveQueryModal">
+                        <i class="bi bi-save"></i> Save Query
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div id="resultSection" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3>Query Results</h3>
+                <div class="btn-group" role="group">
+                    <button type="button" class="btn btn-outline-primary" onclick="showTableView()">Table View</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="showChartView()">Chart View</button>
+                    <button type="button" class="btn btn-outline-primary" onclick="showMapView()">Geo Map</button>
+                </div>
+            </div>
+            
+            <div id="tableView">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Columns</h5>
+                                <small class="text-muted">Hover for top 10 values</small>
+                            </div>
+                            <div class="card-body p-0">
+                                <ul id="columnList" class="list-group list-group-flush">
+                                    <!-- Column names will be added here -->
+                                </ul>
+                            </div>
+                        </div>
+                        <div id="columnStatsTooltip" class="card" style="display: none; position: absolute; z-index: 1000; max-width: 300px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+                            <div class="card-header py-2 px-3">
+                                <h6 id="tooltipTitle" class="mb-0"></h6>
+                            </div>
+                            <div class="card-body p-2">
+                                <div id="tooltipContent" class="small"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-9">
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered">
+                                <thead id="resultHeader"></thead>
+                                <tbody id="resultBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="chartView" style="display: none;">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label for="chartType" class="form-label">Chart Type</label>
+                        <select class="form-select" id="chartType" onchange="updateChart()">
+                            <option value="bar">Bar Chart</option>
+                            <option value="horizontalBar">Column Chart</option>
+                            <option value="line">Line Chart</option>
+                            <option value="area">Area Chart</option>
+                            <option value="pie">Pie Chart</option>
+                            <option value="doughnut">Doughnut Chart</option>
+                            <option value="radar">Radar Chart</option>
+                            <option value="polarArea">Polar Area</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="xAxis" class="form-label">X-Axis</label>
+                        <select class="form-select searchable-select" id="xAxis" onchange="updateChart()"></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="yAxis" class="form-label">Y-Axis</label>
+                        <select class="form-select searchable-select" id="yAxis" onchange="updateChart()"></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="aggregation" class="form-label">Aggregation</label>
+                        <select class="form-select" id="aggregation" onchange="updateChart()">
+                            <option value="count">Count</option>
+                            <option value="sum">Sum</option>
+                            <option value="avg">Average</option>
+                            <option value="min">Minimum</option>
+                            <option value="max">Maximum</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="chart-container" style="position: relative; height:60vh; width:100%">
+                    <canvas id="resultChart"></canvas>
+                </div>
+            </div>
+            
+            <div id="mapView" style="display: none;">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label for="latField" class="form-label">Latitude Field</label>
+                        <select class="form-select searchable-select" id="latField" onchange="updateMap()"></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="lngField" class="form-label">Longitude Field</label>
+                        <select class="form-select searchable-select" id="lngField" onchange="updateMap()"></select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="sizeField" class="form-label">Size Field (Optional)</label>
+                        <select class="form-select searchable-select" id="sizeField" onchange="updateMap()">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="colorField" class="form-label">Color Field (Optional)</label>
+                        <select class="form-select searchable-select" id="colorField" onchange="updateMap()">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="map" style="height: 60vh; width: 100%; border-radius: 5px;"></div>
+                <div class="alert alert-info mt-2">
+                    <small>For Geo Map to work, your data should contain latitude and longitude fields. 
+                    If your data has IP addresses, you may need to convert them to coordinates first.</small>
+                </div>
+            </div>
+        </div>
+        <div id="errorSection" class="alert alert-danger" style="display: none;"></div>
+    </div>
+</div>
+
+<div class="modal fade" id="saveQueryModal" tabindex="-1" aria-labelledby="saveQueryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Save Query</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="saveQueryForm">
+                    <div class="mb-3">
+                        <label for="queryName" class="form-label">Query Name</label>
+                        <input type="text" class="form-control" id="queryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="queryDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="queryDescription" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="saveType" class="form-label">Save As</label>
+                        <select class="form-select" id="saveType" onchange="toggleSaveOptions()">
+                            <option value="query">Saved Query</option>
+                            <option value="alert">Alert</option>
+                            <option value="report">Report</option>
+                            <option value="dashboard">Dashboard Widget</option>
+                        </select>
+                    </div>
+                    
+                    <div id="alertOptions" style="display: none;">
+                        <div class="mb-3">
+                            <label for="alertThreshold" class="form-label">Threshold</label>
+                            <input type="number" class="form-control" id="alertThreshold">
+                        </div>
+                        <div class="mb-3">
+                            <label for="alertCondition" class="form-label">Condition</label>
+                            <select class="form-select" id="alertCondition">
+                                <option value="greater_than">Greater Than</option>
+                                <option value="less_than">Less Than</option>
+                                <option value="equals">Equals</option>
+                                <option value="not_equals">Not Equals</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="alertFrequency" class="form-label">Check Frequency (minutes)</label>
+                            <input type="number" class="form-control" id="alertFrequency" value="15">
+                        </div>
+                    </div>
+                    
+                    <div id="reportOptions" style="display: none;">
+                        <div class="mb-3">
+                            <label for="reportSchedule" class="form-label">Schedule</label>
+                            <select class="form-select" id="reportSchedule">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="reportFormat" class="form-label">Format</label>
+                            <select class="form-select" id="reportFormat">
+                                <option value="pdf">PDF</option>
+                                <option value="excel">Excel</option>
+                                <option value="csv">CSV</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="dashboardOptions" style="display: none;">
+                        <div class="mb-3">
+                            <label for="dashboardLayout" class="form-label">Layout</label>
+                            <select class="form-select" id="dashboardLayout">
+                                <option value="full">Full Width</option>
+                                <option value="half">Half Width</option>
+                                <option value="third">One Third</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="refreshInterval" class="form-label">Refresh Interval (seconds)</label>
+                            <input type="number" class="form-control" id="refreshInterval" value="300">
+                        </div>
+                        <div class="mb-3">
+                            <label for="defaultVisualization" class="form-label">Default Visualization</label>
+                            <select class="form-select" id="defaultVisualization">
+                                <option value="table">Table</option>
+                                <option value="bar">Bar Chart</option>
+                                <option value="line">Line Chart</option>
+                                <option value="pie">Pie Chart</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuery()">Save Query</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
+<script>
+let currentData = null;
+let currentSchema = null;
+let currentChart = null;
+let map = null;
+let searchableSelects = {};
+let tabCounter = 3;
+
+async function getConnectionSettings() {
+    try {
+        const response = await fetch('/api/admin/connections');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch connection settings: ${response.statusText}`);
+        }
+        const settings = await response.json();
+        return {
+            host: settings.host,
+            port: settings.port,
+            username: settings.username,
+            useHttps: settings.use_ssl,
+            useAuth: !!settings.username
+        };
+    } catch (error) {
+        console.error('Error fetching connection settings:', error);
+        displayError('Could not fetch connection settings. Please configure them in the Admin -> Connection section.');
+        return null;
+    }
+}
+
+async function executeQuery() {
+    const activeTabId = document.querySelector('#queryTabs .nav-link.active').id.replace('-tab', '');
+    const tabNum = activeTabId.replace('tab', '');
+    const queryInput = document.getElementById(`sqlQuery${tabNum}`);
+    const queryLanguageSelect = document.getElementById(`queryLanguage${tabNum}`);
+    const indexNameInput = document.getElementById(`indexName${tabNum}`);
+    
+    const query = queryInput.value;
+    const language = queryLanguageSelect.value;
+    const indexName = language === 'dsl' ? indexNameInput.value : null;
+
+    if (!query) {
+        displayError('Please enter a query.');
+        return;
+    }
+    
+    if (language === 'dsl' && !indexName) {
+        displayError('Please enter an index name for DSL queries.');
+        return;
+    }
+
+    const connectionSettings = await getConnectionSettings();
+    if (!connectionSettings) {
+        return; 
+    }
+
+    document.getElementById('errorSection').style.display = 'none';
+    document.getElementById('resultSection').style.display = 'none';
+
+    fetch('/execute_sql', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            query: query, 
+            language: language, 
+            connection: connectionSettings,
+            index_name: indexName 
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (data.data && data.data.schema && data.data.datarows) {
+                processResults(data.data);
+            } else {
+                console.warn("Unexpected successful response structure:", data);
+                displayRawJson(data.data);
+            }
+        } else {
+            displayError(data.error || 'An unknown error occurred');
+        }
+    })
+    .catch(error => {
+        console.error('Error executing query:', error);
+        displayError('An error occurred while executing the query. Check console for details.');
+    });
+}
+
+function processResults(data) {
+    const resultHeader = document.getElementById('resultHeader');
+    const resultBody = document.getElementById('resultBody');
+    const columnList = document.getElementById('columnList');
+    resultHeader.innerHTML = '';
+    resultBody.innerHTML = '';
+    columnList.innerHTML = '';
+
+    if (data.schema && data.datarows) {
+        currentSchema = data.schema;
+        currentData = data.datarows;
+        
+        const headerRow = document.createElement('tr');
+        data.schema.forEach(col => {
+            const th = document.createElement('th');
+            th.textContent = col.name;
+            headerRow.appendChild(th);
+        });
+        resultHeader.appendChild(headerRow);
+
+        data.datarows.forEach(row => {
+            const tr = document.createElement('tr');
+            row.forEach(value => {
+                const td = document.createElement('td');
+                td.textContent = value != null ? value : "";
+                tr.appendChild(td);
+            });
+            resultBody.appendChild(tr);
+        });
+
+        generateColumnStats(data);
+        createColumnList(data.schema);
+        populateChartOptions(data.schema);
+        populateMapOptions(data.schema);
+        document.getElementById('resultSection').style.display = 'block';
+        showTableView();
+    } else {
+        displayError('No results found or unexpected format.');
+    }
+}
+
+function displayError(message) {
+    const errorDiv = document.getElementById('errorSection');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+}
+
+function showTableView() {
+    document.getElementById('tableView').style.display = 'block';
+    document.getElementById('chartView').style.display = 'none';
+    document.getElementById('mapView').style.display = 'none';
+}
+
+function showChartView() {
+    document.getElementById('tableView').style.display = 'none';
+    document.getElementById('chartView').style.display = 'block';
+    document.getElementById('mapView').style.display = 'none';
+    updateChart();
+}
+
+function showMapView() {
+    document.getElementById('tableView').style.display = 'none';
+    document.getElementById('chartView').style.display = 'none';
+    document.getElementById('mapView').style.display = 'block';
+    
+    if (!map) {
+        map = L.map('map').setView([0, 0], 2);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+    }
+    
+    updateMap();
+}
+
+function updateChart() {
+    if (!currentData) return;
+    
+    const chartType = document.getElementById('chartType').value;
+    const xAxisIndex = parseInt(document.getElementById('xAxis').value);
+    const yAxisIndex = parseInt(document.getElementById('yAxis').value);
+    const aggregationType = document.getElementById('aggregation').value;
+    
+    const xAxisName = currentData.schema[xAxisIndex].name;
+    const yAxisName = currentData.schema[yAxisIndex].name;
+    
+    const uniqueXValues = [...new Set(currentData.datarows.map(row => row[xAxisIndex]))];
+    
+    const chartData = uniqueXValues.map(xValue => {
+        const filteredRows = currentData.datarows.filter(row => row[xAxisIndex] === xValue);
+        
+        let aggregatedValue;
+        if (aggregationType === 'count') {
+            aggregatedValue = filteredRows.length;
+        } else if (aggregationType === 'sum') {
+            aggregatedValue = filteredRows.reduce((sum, row) => {
+                const val = parseFloat(row[yAxisIndex]);
+                return sum + (isNaN(val) ? 0 : val);
+            }, 0);
+        } else if (aggregationType === 'avg') {
+            const validValues = filteredRows.map(row => parseFloat(row[yAxisIndex]))
+                .filter(val => !isNaN(val));
+            aggregatedValue = validValues.length > 0 ? 
+                validValues.reduce((sum, val) => sum + val, 0) / validValues.length : 0;
+        } else if (aggregationType === 'min') {
+            const validValues = filteredRows.map(row => parseFloat(row[yAxisIndex]))
+                .filter(val => !isNaN(val));
+            aggregatedValue = validValues.length > 0 ? Math.min(...validValues) : 0;
+        } else if (aggregationType === 'max') {
+            const validValues = filteredRows.map(row => parseFloat(row[yAxisIndex]))
+                .filter(val => !isNaN(val));
+            aggregatedValue = validValues.length > 0 ? Math.max(...validValues) : 0;
+        }
+        
+        return {
+            x: xValue || 'null',
+            y: aggregatedValue
+        };
+    });
+    
+    chartData.sort((a, b) => {
+        if (typeof a.x === 'string' && typeof b.x === 'string') {
+            return a.x.localeCompare(b.x);
+        }
+        return a.x - b.x;
+    });
+
+    let chartConfig = {
+        type: chartType === 'area' ? 'line' : (chartType === 'horizontalBar' ? 'bar' : chartType),
+        data: {
+            labels: chartData.map(d => d.x),
+            datasets: [{
+                label: `${aggregationType} of ${yAxisName} by ${xAxisName}`,
+                data: chartData.map(d => d.y),
+                backgroundColor: [
+                    'rgba(75, 192, 192, 0.6)',
+                    'rgba(54, 162, 235, 0.6)',
+                    'rgba(255, 206, 86, 0.6)',
+                    'rgba(153, 102, 255, 0.6)',
+                    'rgba(255, 159, 64, 0.6)',
+                    'rgba(255, 99, 132, 0.6)'
+                ],
+                borderColor: [
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)',
+                    'rgba(255, 99, 132, 1)'
+                ],
+                borderWidth: 1,
+                fill: chartType === 'area' ? 'origin' : false
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: xAxisName
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: `${aggregationType} of ${yAxisName}`
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: `${aggregationType} of ${yAxisName} by ${xAxisName}`
+                },
+                legend: {
+                    display: ['pie', 'doughnut', 'polarArea'].includes(chartType)
+                }
+            }
+        }
+    };
+    
+    if (chartType === 'horizontalBar') {
+        chartConfig.options.indexAxis = 'y';
+    }
+    
+    const ctx = document.getElementById('resultChart').getContext('2d');
+    if (currentChart) {
+        currentChart.destroy();
+    }
+    currentChart = new Chart(ctx, chartConfig);
+}
+
+function updateMap() {
+    if (!currentData || !map) return;
+    
+    const latIndex = parseInt(document.getElementById('latField').value);
+    const lngIndex = parseInt(document.getElementById('lngField').value);
+    const sizeIndex = document.getElementById('sizeField').value !== '' ? parseInt(document.getElementById('sizeField').value) : null;
+    const colorIndex = document.getElementById('colorField').value !== '' ? parseInt(document.getElementById('colorField').value) : null;
+    
+    map.eachLayer(layer => {
+        if (layer instanceof L.Marker || layer instanceof L.Circle) {
+            map.removeLayer(layer);
+        }
+    });
+    
+    let hasBaseLayer = false;
+    map.eachLayer(layer => {
+        if (layer instanceof L.TileLayer) {
+            hasBaseLayer = true;
+        }
+    });
+    
+    if (!hasBaseLayer) {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+    }
+    
+    const markers = [];
+    const validPoints = [];
+    
+    currentData.forEach(row => {
+        let lat = parseFloat(row[latIndex]);
+        let lng = parseFloat(row[lngIndex]);
+        
+        if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+            return;
+        }
+        
+        validPoints.push([lat, lng]);
+        
+        let markerSize = 5;
+        if (sizeIndex !== null) {
+            const sizeValue = parseFloat(row[sizeIndex]);
+            if (!isNaN(sizeValue)) {
+                markerSize = Math.max(5, Math.min(30, 5 + sizeValue * 2));
+            }
+        }
+        
+        let markerColor = '#3388ff';
+        if (colorIndex !== null) {
+            const colorValue = row[colorIndex];
+            if (colorValue) {
+                markerColor = stringToColor(colorValue.toString());
+            }
+        }
+        
+        const marker = L.circleMarker([lat, lng], {
+            radius: markerSize,
+            fillColor: markerColor,
+            color: '#000',
+            weight: 1,
+            opacity: 0.8,
+            fillOpacity: 0.6
+        });
+        
+        let popupContent = '<div class="marker-popup">';
+        for (let i = 0; i < currentData.schema.length; i++) {
+            popupContent += `<strong>${currentData.schema[i].name}:</strong> ${row[i]}<br>`;
+        }
+        popupContent += '</div>';
+        
+        marker.bindPopup(popupContent);
+        marker.addTo(map);
+        markers.push(marker);
+    });
+    
+    if (validPoints.length > 0) {
+        map.fitBounds(validPoints);
+    } else {
+        map.setView([0, 0], 2);
+    }
+}
+
+function stringToColor(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    let color = '#';
+    for (let i = 0; i < 3; i++) {
+        const value = (hash >> (i * 8)) & 0xFF;
+        color += ('00' + value.toString(16)).substr(-2);
+    }
+    return color;
+}
+
+function generateColumnStats(result) {
+    columnStats = {};
+    result.schema.forEach((col, colIndex) => {
+        const colName = col.name;
+        const valueMap = new Map();
+        const totalRows = result.datarows.length;
+        
+        result.datarows.forEach(row => {
+            const value = row[colIndex] !== null ? row[colIndex].toString() : 'null';
+            valueMap.set(value, (valueMap.get(value) || 0) + 1);
+        });
+        
+        const valueArray = Array.from(valueMap.entries()).map(([value, count]) => ({
+            value: value,
+            count: count,
+            percentage: (count / totalRows * 100).toFixed(1)
+        }));
+        
+        valueArray.sort((a, b) => b.count - a.count);
+        
+        columnStats[colName] = valueArray.slice(0, 10);
+    });
+}
+
+function createTableView(result) {
+    const resultHeader = document.getElementById('resultHeader');
+    const resultBody = document.getElementById('resultBody');
+    
+    const headerRow = document.createElement('tr');
+    result.schema.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col.name;
+        headerRow.appendChild(th);
+    });
+    resultHeader.appendChild(headerRow);
+
+    result.datarows.forEach(row => {
+        const tr = document.createElement('tr');
+        row.forEach(value => {
+            const td = document.createElement('td');
+            td.textContent = value != null ? value : "";
+            tr.appendChild(td);
+        });
+        resultBody.appendChild(tr);
+    });
+}
+
+function createColumnList(schema) {
+    const columnList = document.getElementById('columnList');
+    const tooltip = document.getElementById('columnStatsTooltip');
+    const tooltipTitle = document.getElementById('tooltipTitle');
+    const tooltipContent = document.getElementById('tooltipContent');
+    
+    schema.forEach(col => {
+        const colName = col.name;
+        const li = document.createElement('li');
+        li.className = 'list-group-item d-flex justify-content-between align-items-center';
+        li.textContent = colName;
+        
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-secondary';
+        badge.textContent = col.type;
+        li.appendChild(badge);
+        
+        li.addEventListener('mouseenter', (event) => {
+            const stats = columnStats[colName];
+            if (stats && stats.length > 0) {
+                tooltipTitle.textContent = colName;
+                
+                let content = '<table class="table table-sm mb-0"><thead><tr><th>Value</th><th>Count</th><th>%</th></tr></thead><tbody>';
+                stats.forEach(item => {
+                    content += `<tr><td>${item.value}</td><td>${item.count}</td><td>${item.percentage}%</td></tr>`;
+                });
+                content += '</tbody></table>';
+                
+                tooltipContent.innerHTML = content;
+                
+                const rect = li.getBoundingClientRect();
+                tooltip.style.left = (rect.right + 10) + 'px';
+                tooltip.style.top = (rect.top) + 'px';
+                tooltip.style.display = 'block';
+            }
+        });
+        
+        li.addEventListener('mouseleave', () => {
+            tooltip.style.display = 'none';
+        });
+        
+        columnList.appendChild(li);
+    });
+}
+
+function populateChartOptions(schema) {
+    const xAxisSelect = document.getElementById('xAxis');
+    const yAxisSelect = document.getElementById('yAxis');
+    
+    xAxisSelect.innerHTML = '';
+    yAxisSelect.innerHTML = '';
+    
+    schema.forEach((col, index) => {
+        const xOption = document.createElement('option');
+        xOption.value = index;
+        xOption.textContent = col.name;
+        xAxisSelect.appendChild(xOption);
+        
+        const yOption = document.createElement('option');
+        yOption.value = index;
+        yOption.textContent = col.name;
+        yAxisSelect.appendChild(yOption);
+    });
+    
+    if (schema.length > 1) {
+        xAxisSelect.selectedIndex = 0;
+        yAxisSelect.selectedIndex = 1;
+    }
+}
+
+function populateMapOptions(schema) {
+    const latField = document.getElementById('latField');
+    const lngField = document.getElementById('lngField');
+    const sizeField = document.getElementById('sizeField');
+    const colorField = document.getElementById('colorField');
+    
+    latField.innerHTML = '';
+    lngField.innerHTML = '';
+    sizeField.innerHTML = '<option value="">None</option>';
+    colorField.innerHTML = '<option value="">None</option>';
+    
+    schema.forEach((col, index) => {
+        const latOption = document.createElement('option');
+        latOption.value = index;
+        latOption.textContent = col.name;
+        latField.appendChild(latOption);
+        
+        const lngOption = document.createElement('option');
+        lngOption.value = index;
+        lngOption.textContent = col.name;
+        lngField.appendChild(lngOption);
+        
+        const sizeOption = document.createElement('option');
+        sizeOption.value = index;
+        sizeOption.textContent = col.name;
+        sizeField.appendChild(sizeOption);
+        
+        const colorOption = document.createElement('option');
+        colorOption.value = index;
+        colorOption.textContent = col.name;
+        colorField.appendChild(colorOption);
+    });
+    
+    for (let i = 0; i < schema.length; i++) {
+        const name = schema[i].name.toLowerCase();
+        if (name.includes('lat')) {
+            latField.value = i;
+        } else if (name.includes('lon') || name.includes('lng')) {
+            lngField.value = i;
+        }
+    }
+}
+
+function initializeSearchableSelects() {
+    $('.searchable-select').each(function() {
+        $(this).select2({
+            width: '100%',
+            placeholder: 'Search and select field',
+            allowClear: true
+        });
+        
+        $(this).on('select2:select', function(e) {
+            this.dispatchEvent(new Event('change'));
+        });
+    });
+}
+
+function updateActiveFiltersDisplay() {
+    // Implementation needed
+}
+
+function addTab() {
+    tabCounter++;
+    const newTabId = `tab${tabCounter}`;
+
+    const newTabButton = document.createElement('li');
+    newTabButton.className = 'nav-item';
+    newTabButton.setAttribute('role', 'presentation');
+    newTabButton.innerHTML = `
+        <button class="nav-link" id="${newTabId}-tab" data-bs-toggle="tab" data-bs-target="#${newTabId}" type="button" role="tab" aria-controls="${newTabId}" aria-selected="false">
+            Query ${tabCounter} <span class="close-tab" data-tab="${tabCounter}" title="Close Tab">&times;</span>
+        </button>
+    `;
+
+    const newTabContent = document.createElement('div');
+    newTabContent.className = 'tab-pane fade';
+    newTabContent.id = newTabId;
+    newTabContent.setAttribute('role', 'tabpanel');
+    newTabContent.setAttribute('aria-labelledby', `${newTabId}-tab`);
+    newTabContent.innerHTML = `
+        <div class="row mb-2">
+            <div class="col-md-3">
+                <label for="queryLanguage${tabCounter}" class="form-label">Query Language:</label>
+                <select class="form-select queryLanguage" id="queryLanguage${tabCounter}" data-tab="${tabCounter}" onchange="updateSampleQuery(${tabCounter}); toggleIndexInput(${tabCounter});">
+                    <option value="sql" selected>SQL</option>
+                    <option value="ppl">PPL (Piped Processing Language)</option>
+                    <option value="dsl">DSL (Elasticsearch Query DSL)</option>
+                </select>
+            </div>
+            <div class="col-md-3 index-input-container" id="indexContainer${tabCounter}" style="display: none;">
+                <label for="indexName${tabCounter}" class="form-label">Index Name:</label>
+                <input type="text" class="form-control" id="indexName${tabCounter}" placeholder="Enter index name" value="pa_logs">
+            </div>
+            <div class="col-md-6 text-end">
+                 <button type="button" class="btn btn-sm btn-outline-secondary mt-4 me-2" onclick="loadSampleQuery(${tabCounter})">
+                    Load Sample Query
+                </button>
+            </div>
+        </div>
+        <label for="sqlQuery${tabCounter}" class="form-label">Enter Query:</label>
+        <textarea class="form-control sqlQuery" id="sqlQuery${tabCounter}" data-tab="${tabCounter}" rows="5" required>SELECT * FROM pa_logs LIMIT 10</textarea>
+         <div id="dslHelpText${tabCounter}" class="alert alert-info mt-2" style="display: none;">
+            <strong>DSL Query Format:</strong> Enter a valid JSON object. The index name specified above will be used.
+            <pre class="mb-0 mt-2">
+# Simple query to return all documents:
+{
+  "query": { "match_all": {} },
+  "size": 100
+}
+
+# The index name field is NOT needed in your query - it will be automatically added.</pre>
+        </div>
+    `;
+
+    const addTabLi = document.getElementById('addTabBtn').parentNode;
+    document.getElementById('queryTabs').insertBefore(newTabButton, addTabLi);
+    document.getElementById('queryTabContent').appendChild(newTabContent);
+
+    newTabButton.querySelector('.close-tab').addEventListener('click', function(e) {
+        e.stopPropagation();
+        removeTab(this.dataset.tab);
+    });
+    
+    const newTabTrigger = new bootstrap.Tab(newTabButton.querySelector('.nav-link'));
+    newTabTrigger.show();
+}
+
+function removeTab(tabNum) {
+    const tabId = `tab${tabNum}`;
+    const tabButton = document.getElementById(`${tabId}-tab`).parentNode;
+    const tabContent = document.getElementById(tabId);
+    const isActive = tabButton.querySelector('.nav-link').classList.contains('active');
+
+    tabButton.remove();
+    tabContent.remove();
+
+    if (isActive) {
+        const firstTabButton = document.querySelector('#queryTabs .nav-link');
+        if (firstTabButton) {
+            const firstTabTrigger = new bootstrap.Tab(firstTabButton);
+            firstTabTrigger.show();
+        }
+    }
+}
+
+function toggleIndexInput(tabNum) {
+    const languageSelect = document.getElementById(`queryLanguage${tabNum}`);
+    const indexContainer = document.getElementById(`indexContainer${tabNum}`);
+    const dslHelpText = document.getElementById(`dslHelpText${tabNum}`);
+    if (languageSelect.value === 'dsl') {
+        indexContainer.style.display = 'block';
+        dslHelpText.style.display = 'block';
+    } else {
+        indexContainer.style.display = 'none';
+        dslHelpText.style.display = 'none';
+    }
+}
+
+function loadSampleQuery(tabNum) {
+    const languageSelect = document.getElementById(`queryLanguage${tabNum}`);
+    const queryInput = document.getElementById(`sqlQuery${tabNum}`);
+    const language = languageSelect.value;
+    const indexName = document.getElementById(`indexName${tabNum}`)?.value || 'pa_logs';
+
+    let sampleQuery = '';
+    switch (language) {
+        case 'sql':
+            sampleQuery = `SELECT * FROM ${indexName} LIMIT 10`;
+            break;
+        case 'ppl':
+            sampleQuery = `source = ${indexName} | head 10`;
+            break;
+        case 'dsl':
+            sampleQuery = JSON.stringify({ query: { match_all: {} }, size: 10 }, null, 2);
+            break;
+    }
+    queryInput.value = sampleQuery;
+}
+
+function updateSampleQuery(tabNum) {
+    loadSampleQuery(tabNum);
+}
+
+function toggleSaveOptions() {
+    const saveType = document.getElementById('saveType').value;
+    document.getElementById('alertOptions').style.display = saveType === 'alert' ? 'block' : 'none';
+    document.getElementById('reportOptions').style.display = saveType === 'report' ? 'block' : 'none';
+    document.getElementById('dashboardOptions').style.display = saveType === 'dashboard' ? 'block' : 'none';
+}
+
+function saveQuery() {
+    const saveType = document.getElementById('saveType').value;
+    const queryName = document.getElementById('queryName').value;
+    const queryDescription = document.getElementById('queryDescription').value;
+    const activeQueryId = `sqlQuery${tabNum}`;
+    const queryText = document.getElementById(activeQueryId).value;
+    
+    let saveData = {
+        name: queryName,
+        description: queryDescription,
+        query: queryText,
+        type: saveType
+    };
+    
+    if (saveType === 'alert') {
+        saveData.threshold = document.getElementById('alertThreshold').value;
+        saveData.condition = document.getElementById('alertCondition').value;
+        saveData.frequency = document.getElementById('alertFrequency').value;
+    } else if (saveType === 'report') {
+        saveData.schedule = document.getElementById('reportSchedule').value;
+        saveData.format = document.getElementById('reportFormat').value;
+    } else if (saveType === 'dashboard') {
+        saveData.layout = document.getElementById('dashboardLayout').value;
+        saveData.refreshInterval = document.getElementById('refreshInterval').value;
+        saveData.defaultVisualization = document.getElementById('defaultVisualization').value;
+    }
+    
+    fetch('/save_query', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(saveData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#saveQueryModal').modal('hide');
+            showAlert('success', 'Query saved successfully!');
+            
+            if (saveType === 'alert' && data.query_id) {
+                window.location.href = `/alerts?query_id=${data.query_id}`;
+            }
+        } else {
+            showAlert('error', data.error || 'Failed to save query');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('error', 'Failed to save query');
+    });
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    document.querySelector('.col-12').insertBefore(alertDiv, document.querySelector('.card'));
+    
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+
+function displayRawJson(data) {
+    const resultHeader = document.getElementById('resultHeader');
+    const resultBody = document.getElementById('resultBody');
+    resultHeader.innerHTML = '<tr><th>Raw JSON Response</th></tr>';
+    resultBody.innerHTML = `<tr><td><pre>${JSON.stringify(data, null, 2)}</pre></td></tr>`;
+    document.getElementById('resultSection').style.display = 'block';
+    document.getElementById('chartView').style.display = 'none';
+    document.getElementById('mapView').style.display = 'none';
+    document.getElementById('tableView').style.display = 'block';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('addTabBtn').addEventListener('click', addTab);
+    
+    document.querySelectorAll('#queryTabs .nav-link').forEach(tabLink => {
+        if (tabLink.id !== 'addTabBtn') {
+            const tabNum = tabLink.id.replace('tab', '').replace('-tab', '');
+            const closeSpan = document.createElement('span');
+            closeSpan.className = 'close-tab';
+            closeSpan.innerHTML = '&times;';
+            closeSpan.dataset.tab = tabNum;
+            closeSpan.title = 'Close Tab';
+            closeSpan.addEventListener('click', function(e) {
+                e.stopPropagation(); 
+                removeTab(this.dataset.tab);
+            });
+            tabLink.appendChild(closeSpan);
+        }
+    });
+    
+    loadSampleQuery(1);
+    toggleIndexInput(1);
+});
+</script>
+{% endblock %} 

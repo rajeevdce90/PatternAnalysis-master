@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Pattern Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .upload-zone {
+            border: 2px dashed #ccc;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: #0d6efd;
+            background: #e9ecef;
+        }
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+        .card {
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid rgba(0,0,0,0.125);
+            font-weight: bold;
+        }
+        .list-group-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .badge {
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <h1 class="text-center mb-5">Log Pattern Analysis</h1>
+        
+        <div class="upload-zone" id="uploadZone">
+            <h4>Drag & Drop Log File</h4>
+            <p class="text-muted">or click to select file</p>
+            <input type="file" id="fileInput" class="d-none" accept=".csv,.json">
+        </div>
+
+        <div class="loading text-center" id="loading">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3">Analyzing log patterns...</p>
+        </div>
+
+        <div class="results" id="results">
+            <div class="row">
+                <div class="col-md-12 mb-4">
+                    <div class="card">
+                        <div class="card-header">Summary</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <h5>Total Events</h5>
+                                    <p class="h3" id="totalEvents">0</p>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <h5>Time Range</h5>
+                                    <p class="h6" id="timeRange">-</p>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <h5>Valid Events</h5>
+                                    <p class="h3" id="validEvents">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Event Distribution</div>
+                        <div class="card-body">
+                            <canvas id="eventDistribution"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Events Over Time</div>
+                        <div class="card-body">
+                            <canvas id="eventsOverTime"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-header">Top Actions</div>
+                        <ul class="list-group list-group-flush" id="topActions"></ul>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-header">Top Users</div>
+                        <ul class="list-group list-group-flush" id="topUsers"></ul>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-header">Top Source IPs</div>
+                        <ul class="list-group list-group-flush" id="topSourceIPs"></ul>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card">
+                        <div class="card-header">Top Applications</div>
+                        <ul class="list-group list-group-flush" id="topApplications"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const uploadZone = document.getElementById('uploadZone');
+        const fileInput = document.getElementById('fileInput');
+        const loading = document.getElementById('loading');
+        const results = document.getElementById('results');
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            uploadZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            uploadZone.classList.remove('dragover');
+        }
+
+        // Handle dropped files
+        uploadZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+
+        // Handle selected files
+        uploadZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', function() {
+            handleFiles(this.files);
+        });
+
+        function handleFiles(files) {
+            const file = files[0];
+            if (file) {
+                loading.style.display = 'block';
+                uploadZone.style.display = 'none';
+                results.style.display = 'none';
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                        loading.style.display = 'none';
+                        uploadZone.style.display = 'block';
+                    } else {
+                        displayResults(data);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while processing the file.');
+                    loading.style.display = 'none';
+                    uploadZone.style.display = 'block';
+                });
+            }
+        }
+
+        function displayResults(data) {
+            loading.style.display = 'none';
+            results.style.display = 'block';
+
+            // Update summary statistics
+            document.getElementById('totalEvents').textContent = data.total_events;
+            document.getElementById('validEvents').textContent = data.valid_events;
+            
+            // Format and display time range
+            const startTime = data.time_range.start ? new Date(data.time_range.start).toLocaleString() : 'N/A';
+            const endTime = data.time_range.end ? new Date(data.time_range.end).toLocaleString() : 'N/A';
+            document.getElementById('timeRange').textContent = `${startTime} to ${endTime}`;
+
+            // Create lists
+            createList('topActions', data.actions);
+            createList('topUsers', data.top_users);
+            createList('topSourceIPs', data.top_source_ips);
+            createList('topApplications', data.top_applications);
+
+            // Create charts
+            createDistributionChart(data.event_distribution);
+            createTimelineChart(data.visualizations.events_over_time);
+        }
+
+        function createList(elementId, data) {
+            const element = document.getElementById(elementId);
+            element.innerHTML = '';
+            
+            if (!data || Object.keys(data).length === 0) {
+                element.innerHTML = '<li class="list-group-item text-muted">No data available</li>';
+                return;
+            }
+
+            Object.entries(data).forEach(([key, value]) => {
+                element.innerHTML += `
+                    <li class="list-group-item">
+                        <span>${key}</span>
+                        <span class="badge bg-primary rounded-pill">${value}</span>
+                    </li>
+                `;
+            });
+        }
+
+        function createDistributionChart(data) {
+            const ctx = document.getElementById('eventDistribution').getContext('2d');
+            
+            // Clear any existing chart
+            if (window.distributionChart) {
+                window.distributionChart.destroy();
+            }
+
+            window.distributionChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        data: Object.values(data),
+                        backgroundColor: [
+                            '#007bff',
+                            '#28a745',
+                            '#ffc107',
+                            '#dc3545',
+                            '#6c757d',
+                            '#17a2b8'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTimelineChart(imageData) {
+            const ctx = document.getElementById('eventsOverTime').getContext('2d');
+            const img = new Image();
+            img.src = 'data:image/png;base64,' + imageData;
+            img.onload = function() {
+                ctx.canvas.width = img.width;
+                ctx.canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+            };
+        }
+    </script>
+</body>
+</html> 

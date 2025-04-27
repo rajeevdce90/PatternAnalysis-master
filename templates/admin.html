@@ -1,0 +1,337 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="content-wrapper">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="bi bi-gear"></i> Index Management
+                <small class="text-muted">Manage Indices & Datasets</small>
+            </h1>
+        </div>
+
+        <!-- Index Management Section -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list"></i> Indices</h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createIndexModal">
+                    <i class="bi bi-plus-circle"></i> Create Index
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="indicesTable">
+                        <thead>
+                            <tr>
+                                <th>Index Name</th>
+                                <th>Documents</th>
+                                <th>Size</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Indices will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dataset Management Section -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-database"></i> Datasets</h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadDataModal">
+                    <i class="bi bi-upload"></i> Upload Data
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="datasetsTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Index</th>
+                                <th>Records</th>
+                                <th>Last Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Datasets will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Index Modal -->
+<div class="modal fade" id="createIndexModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Index</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createIndexForm">
+                    <div class="mb-3">
+                        <label class="form-label">Index Name</label>
+                        <input type="text" class="form-control" id="indexName" required>
+                        <small class="text-muted">Use lowercase letters, numbers, and hyphens only</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Shards</label>
+                        <input type="number" class="form-control" id="numShards" value="1" min="1" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Number of Replicas</label>
+                        <input type="number" class="form-control" id="numReplicas" value="1" min="0" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Mapping</label>
+                        <textarea class="form-control" id="indexMapping" rows="10" placeholder="{
+  'properties': {
+    'field1': { 'type': 'text' },
+    'field2': { 'type': 'keyword' }
+  }
+}"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createIndex()">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Data Modal -->
+<div class="modal fade" id="uploadDataModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Dataset</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="uploadDataForm">
+                    <div class="mb-3">
+                        <label class="form-label">Target Index</label>
+                        <select class="form-select" id="targetIndex" required>
+                            <!-- Indices will be loaded here -->
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">File</label>
+                        <input type="file" class="form-control" id="dataFile" accept=".json,.csv,.ndjson" required>
+                        <small class="text-muted">Supported formats: JSON, CSV, NDJSON</small>
+                    </div>
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="clearExisting">
+                            <label class="form-check-label">Clear existing data in index</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="uploadData()">Upload</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load indices and datasets on page load
+$(document).ready(function() {
+    loadIndices();
+    loadDatasets();
+});
+
+function loadIndices() {
+    fetch('/api/admin/indices')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateIndicesTable(data.indices);
+                updateIndexSelect(data.indices);
+            } else {
+                console.error('Failed to load indices:', data.error);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function updateIndicesTable(indices) {
+    const tbody = $('#indicesTable tbody');
+    tbody.empty();
+    
+    indices.forEach(index => {
+        const row = `
+            <tr>
+                <td>${index.name}</td>
+                <td>${index.docs_count}</td>
+                <td>${index.size}</td>
+                <td><span class="badge bg-${index.status === 'green' ? 'success' : 'warning'}">${index.status}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteIndex('${index.name}')">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+
+function updateIndexSelect(indices) {
+    const select = $('#targetIndex');
+    select.empty();
+    
+    indices.forEach(index => {
+        select.append(`<option value="${index.name}">${index.name}</option>`);
+    });
+}
+
+function loadDatasets() {
+    fetch('/api/admin/datasets')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateDatasetsTable(data.datasets);
+            } else {
+                console.error('Failed to load datasets:', data.error);
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function updateDatasetsTable(datasets) {
+    const tbody = $('#datasetsTable tbody');
+    tbody.empty();
+    
+    datasets.forEach(dataset => {
+        const row = `
+            <tr>
+                <td>${dataset.name}</td>
+                <td>${dataset.index}</td>
+                <td>${dataset.record_count}</td>
+                <td>${new Date(dataset.last_updated).toLocaleString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-danger" onclick="deleteDataset('${dataset.id}')">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+
+function createIndex() {
+    const data = {
+        name: $('#indexName').val(),
+        shards: parseInt($('#numShards').val()),
+        replicas: parseInt($('#numReplicas').val()),
+        mapping: JSON.parse($('#indexMapping').val() || '{}')
+    };
+    
+    fetch('/api/admin/indices', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#createIndexModal').modal('hide');
+            loadIndices();
+        } else {
+            alert('Failed to create index: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating index');
+    });
+}
+
+function deleteIndex(indexName) {
+    if (!confirm(`Are you sure you want to delete index "${indexName}"? This cannot be undone.`)) {
+        return;
+    }
+    
+    fetch(`/api/admin/indices/${indexName}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadIndices();
+        } else {
+            alert('Failed to delete index: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deleting index');
+    });
+}
+
+function uploadData() {
+    const formData = new FormData();
+    formData.append('index', $('#targetIndex').val());
+    formData.append('file', $('#dataFile')[0].files[0]);
+    formData.append('clear_existing', $('#clearExisting').is(':checked'));
+    
+    fetch('/api/admin/datasets', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#uploadDataModal').modal('hide');
+            loadDatasets();
+        } else {
+            alert('Failed to upload data: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error uploading data');
+    });
+}
+
+function deleteDataset(datasetId) {
+    if (!confirm('Are you sure you want to delete this dataset? This cannot be undone.')) {
+        return;
+    }
+    
+    fetch(`/api/admin/datasets/${datasetId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadDatasets();
+        } else {
+            alert('Failed to delete dataset: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error deleting dataset');
+    });
+}
+</script>
+{% endblock %} 

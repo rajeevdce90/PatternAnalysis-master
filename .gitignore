@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.env
+
+# Docker
+*.env
+.docker/
+docker-compose.override.yml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Project specific
+uploads/
+saved_queries/
+parsed_output/
+*.log
+*.csv
+node_modules/
+
+# OpenSearch
+opensearch-data/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Virtual Environment
+env/
+ENV/
+
+# Application specific
+settings/
+*.cover
+.hypothesis/
+
+# Test coverage
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Binary files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.pdf
+*.zip
+*.tar.gz 

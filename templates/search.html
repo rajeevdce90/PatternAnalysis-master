@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - Zamuun</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #0085C7;
+            --secondary-color: #F4F4F4;
+            --text-color: #333333;
+            --error-color: #DC3545;
+            --success-color: #28A745;
+            --warning-color: #FFC107;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-right: 1rem;
+        }
+
+        .search-box {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+
+        .query-input {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid var(--secondary-color);
+            border-radius: 4px;
+            font-size: 1rem;
+            margin-bottom: 1rem;
+            font-family: monospace;
+            min-height: 100px;
+        }
+
+        .search-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .search-button:hover {
+            opacity: 0.9;
+        }
+
+        .results {
+            margin-top: 2rem;
+        }
+
+        .result-item {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        .result-content {
+            color: #666;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+
+        .warning-banner {
+            background-color: var(--warning-color);
+            color: var(--text-color);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .warning-icon {
+            margin-right: 0.5rem;
+        }
+
+        .query-help {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        .query-help h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .query-example {
+            background: var(--secondary-color);
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin: 0.5rem 0;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">Zamuun</div>
+        </div>
+
+        {% if not opensearch_available %}
+        <div class="warning-banner">
+            <span class="warning-icon">⚠️</span>
+            <span>OpenSearch is not available. Using fallback storage. Some features may be limited.</span>
+        </div>
+        {% endif %}
+
+        <div class="query-help">
+            <h3>Search Help</h3>
+            <p>You can use the following query formats:</p>
+            <div class="query-example">
+                Simple text search: "error" or "warning"
+            </div>
+            <div class="query-example">
+                Field-specific search: "pattern:error" or "example:warning"
+            </div>
+            <div class="query-example">
+                Boolean operators: "error AND warning" or "error OR warning"
+            </div>
+            <div class="query-example">
+                Wildcards: "err*" or "warn*"
+            </div>
+        </div>
+
+        <div class="search-box">
+            <textarea class="query-input" placeholder="Enter your search query..." id="queryInput"></textarea>
+            <button class="search-button" onclick="searchData()">Search</button>
+        </div>
+
+        <div class="results" id="results">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+
+    <script>
+        function searchData() {
+            const query = document.getElementById('queryInput').value;
+            const resultsDiv = document.getElementById('results');
+            
+            fetch('/search_data', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ query: query })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    resultsDiv.innerHTML = `<div class="result-item">
+                        <div class="result-title">Error</div>
+                        <div class="result-content">${data.error}</div>
+                    </div>`;
+                    return;
+                }
+
+                if (data.results.length === 0) {
+                    resultsDiv.innerHTML = `<div class="result-item">
+                        <div class="result-title">No results found</div>
+                        <div class="result-content">Try a different search query</div>
+                    </div>`;
+                    return;
+                }
+
+                resultsDiv.innerHTML = data.results.map(result => `
+                    <div class="result-item">
+                        <div class="result-title">Pattern: ${result._source?.pattern || result.pattern}</div>
+                        <div class="result-content">Example: ${result._source?.example || result.example || 'N/A'}</div>
+                        ${result._source?.raw_event ? `<div class="result-content">Raw Event: ${result._source.raw_event}</div>` : ''}
+                    </div>
+                `).join('');
+
+                if (data.using_fallback) {
+                    const warningBanner = document.createElement('div');
+                    warningBanner.className = 'warning-banner';
+                    warningBanner.innerHTML = `
+                        <span class="warning-icon">⚠️</span>
+                        <span>Using fallback storage. Some features may be limited.</span>
+                    `;
+                    resultsDiv.insertBefore(warningBanner, resultsDiv.firstChild);
+                }
+            })
+            .catch(error => {
+                resultsDiv.innerHTML = `<div class="result-item">
+                    <div class="result-title">Error</div>
+                    <div class="result-content">${error.message}</div>
+                </div>`;
+            });
+        }
+
+        // Search on Enter key (Ctrl+Enter or Cmd+Enter)
+        document.getElementById('queryInput').addEventListener('keydown', function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                searchData();
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html> 

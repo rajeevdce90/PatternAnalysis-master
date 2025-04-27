@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <!-- Settings Navigation -->
+        <div class="col-md-3">
+            <div class="list-group mb-4">
+                <a href="#connection-settings" class="list-group-item list-group-item-action active" data-bs-toggle="list">Connection Settings</a>
+                <a href="#display-settings" class="list-group-item list-group-item-action" data-bs-toggle="list">Display Settings</a>
+                <a href="#advanced-settings" class="list-group-item list-group-item-action" data-bs-toggle="list">Advanced Settings</a>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <button id="save-settings" class="btn btn-primary w-100 mb-2">Save Settings</button>
+                    <button id="reset-settings" class="btn btn-outline-secondary w-100">Reset to Default</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings Content -->
+        <div class="col-md-9">
+            <div class="tab-content">
+                <!-- Connection Settings -->
+                <div class="tab-pane fade show active" id="connection-settings">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">OpenSearch Connection</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> Configure your OpenSearch connection settings here. Changes will be applied after saving.
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="host" class="form-label">Host</label>
+                                    <input type="text" class="form-control" id="host" name="host">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="port" class="form-label">Port</label>
+                                    <input type="number" class="form-control" id="port" name="port">
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="username" class="form-label">Username</label>
+                                    <input type="text" class="form-control" id="username" name="username">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="password" class="form-label">Password</label>
+                                    <input type="password" class="form-control" id="password" name="password">
+                                </div>
+                            </div>
+                            
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="use_https" name="use_https">
+                                <label class="form-check-label" for="use_https">
+                                    Use HTTPS
+                                </label>
+                            </div>
+                            
+                            <button id="test-connection" class="btn btn-outline-primary">
+                                <i class="fas fa-plug"></i> Test Connection
+                            </button>
+                            <div id="connection-status" class="mt-3" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Display Settings -->
+                <div class="tab-pane fade" id="display-settings">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Display Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="default_rows_per_page" class="form-label">Default Rows Per Page</label>
+                                    <select class="form-select" id="default_rows_per_page" name="default_rows_per_page">
+                                        <option value="10">10</option>
+                                        <option value="25">25</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                        <option value="250">250</option>
+                                        <option value="500">500</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="max_columns_preview" class="form-label">Max Columns in Preview</label>
+                                    <input type="number" class="form-control" id="max_columns_preview" name="max_columns_preview" min="5" max="100">
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="theme" class="form-label">Theme</label>
+                                    <select class="form-select" id="theme" name="theme">
+                                        <option value="light">Light</option>
+                                        <option value="dark">Dark</option>
+                                        <option value="system">System Default</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="default_visualization" class="form-label">Default Visualization</label>
+                                    <select class="form-select" id="default_visualization" name="default_visualization">
+                                        <option value="table">Table</option>
+                                        <option value="chart">Chart</option>
+                                        <option value="map">Map</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Advanced Settings -->
+                <div class="tab-pane fade" id="advanced-settings">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Advanced Settings</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i> Changing these settings may affect application performance.
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="query_timeout" class="form-label">Query Timeout (seconds)</label>
+                                    <input type="number" class="form-control" id="query_timeout" name="query_timeout" min="5" max="300">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="default_index" class="form-label">Default Index</label>
+                                    <input type="text" class="form-control" id="default_index" name="default_index">
+                                </div>
+                            </div>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="auto_refresh" name="auto_refresh">
+                                        <label class="form-check-label" for="auto_refresh">
+                                            Auto-refresh Results
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6" id="refresh-interval-container">
+                                    <label for="refresh_interval" class="form-label">Refresh Interval (seconds)</label>
+                                    <input type="number" class="form-control" id="refresh_interval" name="refresh_interval" min="5" max="300" disabled>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+$(document).ready(function() {
+    // Load settings on page load
+    loadSettings();
+    
+    // Tab navigation
+    $('.list-group-item').on('click', function(e) {
+        e.preventDefault();
+        $(this).tab('show');
+        $('.list-group-item').removeClass('active');
+        $(this).addClass('active');
+    });
+    
+    // Enable/disable refresh interval based on auto-refresh checkbox
+    $('#auto_refresh').on('change', function() {
+        $('#refresh_interval').prop('disabled', !this.checked);
+    });
+    
+    // Test connection
+    $('#test-connection').on('click', function() {
+        const connectionSettings = {
+            host: $('#host').val(),
+            port: $('#port').val(),
+            username: $('#username').val(),
+            password: $('#password').val(),
+            use_https: $('#use_https').prop('checked')
+        };
+        
+        // Show loading state
+        const $button = $(this);
+        const originalText = $button.html();
+        $button.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...');
+        $button.prop('disabled', true);
+        
+        // Test connection
+        $.ajax({
+            url: '/test_connection',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(connectionSettings),
+            success: function(response) {
+                const $status = $('#connection-status');
+                $status.show();
+                
+                if (response.success) {
+                    $status.html(`
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> 
+                            <strong>Connection successful!</strong><br>
+                            Response time: ${response.response_time}<br>
+                            OpenSearch version: ${response.version}
+                        </div>
+                    `);
+                } else {
+                    $status.html(`
+                        <div class="alert alert-danger">
+                            <i class="fas fa-times-circle"></i> 
+                            <strong>Connection failed:</strong><br>
+                            ${response.error}
+                        </div>
+                    `);
+                }
+                
+                // Reset button
+                $button.html(originalText);
+                $button.prop('disabled', false);
+            },
+            error: function(xhr, status, error) {
+                $('#connection-status').show().html(`
+                    <div class="alert alert-danger">
+                        <i class="fas fa-times-circle"></i> 
+                        <strong>Request failed:</strong><br>
+                        ${error}
+                    </div>
+                `);
+                
+                // Reset button
+                $button.html(originalText);
+                $button.prop('disabled', false);
+            }
+        });
+    });
+    
+    // Save settings
+    $('#save-settings').on('click', function() {
+        const settings = {
+            connection: {
+                host: $('#host').val(),
+                port: parseInt($('#port').val()),
+                username: $('#username').val(),
+                password: $('#password').val(),
+                use_https: $('#use_https').prop('checked')
+            },
+            display: {
+                default_rows_per_page: parseInt($('#default_rows_per_page').val()),
+                max_columns_preview: parseInt($('#max_columns_preview').val()),
+                theme: $('#theme').val(),
+                default_visualization: $('#default_visualization').val()
+            },
+            advanced: {
+                query_timeout: parseInt($('#query_timeout').val()),
+                auto_refresh: $('#auto_refresh').prop('checked'),
+                refresh_interval: parseInt($('#refresh_interval').val()),
+                default_index: $('#default_index').val()
+            }
+        };
+        
+        // Show loading state
+        const $button = $(this);
+        const originalText = $button.html();
+        $button.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...');
+        $button.prop('disabled', true);
+        
+        // Save settings
+        $.ajax({
+            url: '/save_settings',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(settings),
+            success: function(response) {
+                if (response.success) {
+                    displayAlert('success', 'Settings saved successfully!');
+                } else {
+                    displayAlert('danger', 'Failed to save settings: ' + response.error);
+                }
+                
+                // Reset button
+                $button.html(originalText);
+                $button.prop('disabled', false);
+            },
+            error: function(xhr, status, error) {
+                displayAlert('danger', 'Failed to save settings: ' + error);
+                
+                // Reset button
+                $button.html(originalText);
+                $button.prop('disabled', false);
+            }
+        });
+    });
+    
+    // Reset settings
+    $('#reset-settings').on('click', function() {
+        if (confirm('Are you sure you want to reset all settings to default values?')) {
+            loadSettings(true);
+        }
+    });
+    
+    function loadSettings(useDefaults = false) {
+        $.ajax({
+            url: '/get_settings',
+            type: 'GET',
+            success: function(settings) {
+                // If there was an error, settings might contain an error and settings object
+                if (settings.error && settings.settings) {
+                    settings = settings.settings;
+                    displayAlert('warning', 'Settings loaded with default values: ' + settings.error);
+                }
+                
+                // Connection settings
+                $('#host').val(settings.connection.host);
+                $('#port').val(settings.connection.port);
+                $('#username').val(settings.connection.username);
+                $('#password').val(settings.connection.password);
+                $('#use_https').prop('checked', settings.connection.use_https);
+                
+                // Display settings
+                $('#default_rows_per_page').val(settings.display.default_rows_per_page);
+                $('#max_columns_preview').val(settings.display.max_columns_preview);
+                $('#theme').val(settings.display.theme);
+                $('#default_visualization').val(settings.display.default_visualization);
+                
+                // Advanced settings
+                $('#query_timeout').val(settings.advanced.query_timeout);
+                $('#auto_refresh').prop('checked', settings.advanced.auto_refresh);
+                $('#refresh_interval').val(settings.advanced.refresh_interval);
+                $('#refresh_interval').prop('disabled', !settings.advanced.auto_refresh);
+                $('#default_index').val(settings.advanced.default_index);
+                
+                if (useDefaults) {
+                    displayAlert('info', 'Settings have been reset to default values. Click Save to apply.');
+                }
+            },
+            error: function(xhr, status, error) {
+                displayAlert('danger', 'Failed to load settings: ' + error);
+            }
+        });
+    }
+    
+    function displayAlert(type, message) {
+        const alertHtml = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        
+        // Insert the alert at the top of the content area
+        $('.tab-content').prepend(alertHtml);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(function() {
+            $('.alert').alert('close');
+        }, 5000);
+    }
+});
+</script>
+{% endblock %} 

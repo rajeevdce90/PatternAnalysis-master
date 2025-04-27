@@ -1,0 +1,889 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid nightwatch-theme">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="nightwatch-title">
+                <i class="bi bi-moon-stars"></i> Nightwatch
+                <small class="text-muted">Alert Monitoring Station</small>
+            </h1>
+            <div class="status-indicator">
+                <span class="pulse"></span>
+                <span class="status-text">Monitoring Active</span>
+                <span class="time" id="currentTime"></span>
+            </div>
+        </div>
+        <div class="refresh-control">
+            <span class="refresh-label">Auto-refresh: </span>
+            <select class="form-select form-select-sm d-inline-block w-auto" id="refreshInterval">
+                <option value="30">30s</option>
+                <option value="60">1m</option>
+                <option value="300">5m</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Stats Cards -->
+    <div class="row mb-4" id="alertStats">
+        <div class="col-md-3">
+            <div class="monitor-card">
+                <div class="card-body">
+                    <div class="monitor-icon"><i class="bi bi-list-check"></i></div>
+                    <h5 class="card-title">Total Alerts</h5>
+                    <h2 class="card-text" id="totalAlerts">-</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="monitor-card active">
+                <div class="card-body">
+                    <div class="monitor-icon"><i class="bi bi-shield-check"></i></div>
+                    <h5 class="card-title">Active Alerts</h5>
+                    <h2 class="card-text" id="activeAlerts">-</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="monitor-card disabled">
+                <div class="card-body">
+                    <div class="monitor-icon"><i class="bi bi-shield-slash"></i></div>
+                    <h5 class="card-title">Disabled Alerts</h5>
+                    <h2 class="card-text" id="disabledAlerts">-</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="monitor-card triggered">
+                <div class="card-body">
+                    <div class="monitor-icon"><i class="bi bi-exclamation-triangle"></i></div>
+                    <h5 class="card-title">Triggered (24h)</h5>
+                    <h2 class="card-text" id="triggeredAlerts">-</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabs -->
+    <ul class="nav nav-tabs nightwatch-tabs mb-4" id="alertTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="alerts-tab" data-bs-toggle="tab" data-bs-target="#alerts-pane" type="button" role="tab">
+                <i class="bi bi-gear"></i> Alert Configurations
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="triggered-tab" data-bs-toggle="tab" data-bs-target="#triggered-pane" type="button" role="tab">
+                <i class="bi bi-activity"></i> Live Monitor
+            </button>
+        </li>
+    </ul>
+    
+    <!-- Tab Content -->
+    <div class="tab-content" id="alertTabsContent">
+        <!-- Alerts Tab -->
+        <div class="tab-pane fade show active" id="alerts-pane" role="tabpanel">
+            <div class="monitor-panel">
+                <div class="panel-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Alert Configurations</h5>
+                    <button class="btn btn-primary nightwatch-btn" id="createAlertBtn">
+                        <i class="bi bi-plus-circle"></i> Create Alert
+                    </button>
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover" id="alertsTable">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Query</th>
+                                    <th>Condition</th>
+                                    <th>Frequency</th>
+                                    <th>Status</th>
+                                    <th>Last Triggered</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Alerts will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Live Monitor Tab -->
+        <div class="tab-pane fade" id="triggered-pane" role="tabpanel">
+            <div class="monitor-panel">
+                <div class="panel-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-activity"></i> Live Monitor</h5>
+                    <div class="monitor-controls">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-funnel"></i></span>
+                            <select class="form-select" id="triggeredAlertFilter">
+                                <option value="">All Alerts</option>
+                            </select>
+                            <input type="datetime-local" class="form-control" id="fromDate">
+                            <input type="datetime-local" class="form-control" id="toDate">
+                            <button class="btn btn-outline-primary" id="applyFilter">
+                                <i class="bi bi-search"></i>
+                            </button>
+                            <button class="btn btn-outline-danger" id="clearFilter">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="panel-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover" id="triggeredAlertsTable">
+                            <thead>
+                                <tr>
+                                    <th>Alert Name</th>
+                                    <th>Triggered At</th>
+                                    <th>Result Value</th>
+                                    <th>Result Count</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Triggered alerts will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Create/Edit Alert Modal -->
+    <div class="modal fade" id="alertModal" tabindex="-1" aria-labelledby="alertModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="alertModalLabel">Create Alert</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="alertForm">
+                        <input type="hidden" id="alertId" name="alertId">
+                        
+                        <div class="mb-3">
+                            <label for="alertName" class="form-label">Alert Name</label>
+                            <input type="text" class="form-control" id="alertName" name="name" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="alertDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="alertDescription" name="description" rows="2"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="queryId" class="form-label">Query</label>
+                            <select class="form-select" id="queryId" name="query_id" required>
+                                <option value="">Select a query</option>
+                                <!-- Queries will be loaded here -->
+                            </select>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="condition" class="form-label">Condition</label>
+                                <select class="form-select" id="condition" name="condition">
+                                    <option value="has_results">Has Results</option>
+                                    <option value="greater_than">Greater Than</option>
+                                    <option value="less_than">Less Than</option>
+                                    <option value="equal_to">Equal To</option>
+                                    <option value="not_equal_to">Not Equal To</option>
+                                    <option value="contains">Contains</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="threshold" class="form-label">Threshold Value</label>
+                                <input type="text" class="form-control" id="threshold" name="threshold">
+                                <div class="form-text">Leave empty for "Has Results" condition</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="status" class="form-label">Status</label>
+                                <select class="form-select" id="status" name="status">
+                                    <option value="active">Active</option>
+                                    <option value="disabled">Disabled</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="frequency" class="form-label">Check Frequency (minutes)</label>
+                                <input type="number" class="form-control" id="frequency" name="frequency" min="5" value="15">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="timespan" class="form-label">Data Timespan (minutes)</label>
+                                <input type="number" class="form-control" id="timespan" name="timespan" min="1" value="60">
+                                <div class="form-text">How far back to look for data</div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="recipients" class="form-label">Recipients</label>
+                            <select class="form-select" id="recipients" name="recipients" multiple>
+                                <!-- Users will be loaded here -->
+                            </select>
+                            <div class="form-text">Users who will receive alert notifications</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveAlertBtn">Save Alert</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Alert Details Modal -->
+    <div class="modal fade" id="alertDetailsModal" tabindex="-1" aria-labelledby="alertDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="alertDetailsModalLabel">Alert Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="alertDetailsContent">
+                    <!-- Alert details will be shown here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.nightwatch-theme {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.nightwatch-title {
+    color: #00ff9d;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.nightwatch-title small {
+    font-size: 1rem;
+    color: #888;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #888;
+}
+
+.pulse {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #00ff9d;
+    box-shadow: 0 0 10px #00ff9d;
+    animation: pulse 2s infinite;
+}
+
+.time {
+    font-family: monospace;
+    font-size: 1.1em;
+    color: #00ff9d;
+}
+
+.monitor-card {
+    background: #2a2a2a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 20px;
+    color: #e0e0e0;
+    transition: all 0.3s ease;
+}
+
+.monitor-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 255, 157, 0.1);
+}
+
+.monitor-card .monitor-icon {
+    font-size: 2em;
+    margin-bottom: 10px;
+    color: #00ff9d;
+}
+
+.monitor-card.active { border-color: #00ff9d; }
+.monitor-card.disabled { border-color: #666; }
+.monitor-card.triggered { border-color: #ff4444; }
+
+.monitor-panel {
+    background: #2a2a2a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.panel-header {
+    background: #333;
+    padding: 15px 20px;
+    border-bottom: 1px solid #444;
+}
+
+.panel-body {
+    padding: 20px;
+}
+
+.nightwatch-tabs .nav-link {
+    color: #888;
+    border: none;
+    padding: 10px 20px;
+    background: transparent;
+}
+
+.nightwatch-tabs .nav-link:hover {
+    color: #00ff9d;
+}
+
+.nightwatch-tabs .nav-link.active {
+    color: #00ff9d;
+    background: #2a2a2a;
+    border: 1px solid #333;
+    border-bottom: none;
+}
+
+.table-dark {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border-color: #333;
+}
+
+.table-dark thead th {
+    background: #333;
+    border-bottom: 2px solid #444;
+}
+
+.nightwatch-btn {
+    background: #00ff9d;
+    border: none;
+    color: #1a1a1a;
+}
+
+.nightwatch-btn:hover {
+    background: #00cc7d;
+    color: #1a1a1a;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.refresh-control {
+    background: #333;
+    padding: 8px 15px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.refresh-label {
+    color: #888;
+}
+
+.monitor-controls .input-group-text,
+.monitor-controls .form-control,
+.monitor-controls .form-select {
+    background: #333;
+    border-color: #444;
+    color: #e0e0e0;
+}
+
+.monitor-controls .btn-outline-primary {
+    color: #00ff9d;
+    border-color: #00ff9d;
+}
+
+.monitor-controls .btn-outline-primary:hover {
+    background: #00ff9d;
+    color: #1a1a1a;
+}
+
+.monitor-controls .btn-outline-danger {
+    color: #ff4444;
+    border-color: #ff4444;
+}
+
+.monitor-controls .btn-outline-danger:hover {
+    background: #ff4444;
+    color: #1a1a1a;
+}
+</style>
+
+<script>
+$(document).ready(function() {
+    // Load alert stats
+    loadAlertStats();
+    
+    // Load alerts
+    loadAlerts();
+    
+    // Load triggered alerts
+    loadTriggeredAlerts();
+    
+    // Load saved queries for dropdown
+    loadSavedQueries();
+    
+    // Load users for recipients dropdown
+    loadUsers();
+    
+    // Check if we should create an alert for a specific query
+    const queryId = sessionStorage.getItem('createAlertForQuery');
+    if (queryId) {
+        // Clear the session storage item
+        sessionStorage.removeItem('createAlertForQuery');
+        
+        // Pre-populate the form with the query ID and show modal
+        $('#queryId').val(queryId);
+        resetAlertForm();
+        $('#alertModalLabel').text('Create Alert');
+        $('#alertModal').modal('show');
+    }
+    
+    // Create Alert button
+    $('#createAlertBtn').on('click', function() {
+        resetAlertForm();
+        $('#alertModalLabel').text('Create Alert');
+        $('#alertModal').modal('show');
+    });
+    
+    // Save Alert button
+    $('#saveAlertBtn').on('click', saveAlert);
+    
+    // Apply filter button
+    $('#applyFilter').on('click', function() {
+        loadTriggeredAlerts();
+    });
+    
+    // Clear filter button
+    $('#clearFilter').on('click', function() {
+        $('#triggeredAlertFilter').val('');
+        $('#fromDate').val('');
+        $('#toDate').val('');
+        loadTriggeredAlerts();
+    });
+    
+    // Set condition change handler
+    $('#condition').on('change', function() {
+        const condition = $(this).val();
+        if (condition === 'has_results') {
+            $('#threshold').prop('disabled', true);
+        } else {
+            $('#threshold').prop('disabled', false);
+        }
+    });
+});
+
+function loadAlertStats() {
+    $.ajax({
+        url: '/api/alert_stats',
+        type: 'GET',
+        success: function(data) {
+            $('#totalAlerts').text(data.total_alerts);
+            $('#activeAlerts').text(data.active_alerts);
+            $('#disabledAlerts').text(data.disabled_alerts);
+            $('#triggeredAlerts').text(data.triggered_last_24h);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading alert stats:', error);
+        }
+    });
+}
+
+function loadAlerts() {
+    $.ajax({
+        url: '/api/alerts',
+        type: 'GET',
+        success: function(alerts) {
+            const $tbody = $('#alertsTable tbody');
+            $tbody.empty();
+            
+            alerts.forEach(function(alert) {
+                let lastTriggered = alert.last_triggered ? 
+                    new Date(alert.last_triggered).toLocaleString() : 'Never';
+                    
+                let condition = getConditionText(alert);
+                
+                const $row = $(`
+                    <tr data-id="${alert.id}">
+                        <td>${alert.name}</td>
+                        <td>${alert.query_name}</td>
+                        <td>${condition}</td>
+                        <td>Every ${alert.frequency} minutes</td>
+                        <td>
+                            <span class="badge ${alert.status === 'active' ? 'bg-success' : 'bg-secondary'}">${alert.status}</span>
+                        </td>
+                        <td>${lastTriggered}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary edit-alert" title="Edit Alert">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger delete-alert" title="Delete Alert">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+                
+                $tbody.append($row);
+            });
+            
+            // Add event handlers
+            $('.edit-alert').on('click', function() {
+                const alertId = $(this).closest('tr').data('id');
+                editAlert(alertId);
+            });
+            
+            $('.delete-alert').on('click', function() {
+                const alertId = $(this).closest('tr').data('id');
+                const alertName = $(this).closest('tr').find('td:first').text();
+                if (confirm(`Are you sure you want to delete the alert "${alertName}"?`)) {
+                    deleteAlert(alertId);
+                }
+            });
+            
+            // Update trigger alert filter options
+            const $filterSelect = $('#triggeredAlertFilter');
+            $filterSelect.find('option[value!=""]').remove();
+            
+            alerts.forEach(function(alert) {
+                $filterSelect.append(`<option value="${alert.id}">${alert.name}</option>`);
+            });
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading alerts:', error);
+        }
+    });
+}
+
+function loadTriggeredAlerts() {
+    // Get filter values
+    const alertId = $('#triggeredAlertFilter').val();
+    const fromDate = $('#fromDate').val() ? new Date($('#fromDate').val()).toISOString() : null;
+    const toDate = $('#toDate').val() ? new Date($('#toDate').val()).toISOString() : null;
+    
+    let url = '/api/triggered_alerts';
+    const params = [];
+    
+    if (alertId) params.push(`alert_id=${alertId}`);
+    if (fromDate) params.push(`from_date=${fromDate}`);
+    if (toDate) params.push(`to_date=${toDate}`);
+    
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
+    
+    $.ajax({
+        url: url,
+        type: 'GET',
+        success: function(triggeredAlerts) {
+            const $tbody = $('#triggeredAlertsTable tbody');
+            $tbody.empty();
+            
+            triggeredAlerts.forEach(function(alert) {
+                const triggeredAt = new Date(alert.triggered_at).toLocaleString();
+                
+                const $row = $(`
+                    <tr data-id="${alert.id}">
+                        <td>${alert.alert_name}</td>
+                        <td>${triggeredAt}</td>
+                        <td>${alert.result_value}</td>
+                        <td>${alert.result_count || 0}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-info view-alert-details" title="View Details">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `);
+                
+                $tbody.append($row);
+            });
+            
+            // Add event handlers
+            $('.view-alert-details').on('click', function() {
+                const alertId = $(this).closest('tr').data('id');
+                showAlertDetails(alertId, triggeredAlerts);
+            });
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading triggered alerts:', error);
+        }
+    });
+}
+
+function loadSavedQueries() {
+    $.ajax({
+        url: '/get_saved_queries',
+        type: 'GET',
+        success: function(queries) {
+            const $select = $('#queryId');
+            $select.find('option[value!=""]').remove();
+            
+            queries.forEach(function(query) {
+                $select.append(`<option value="${query.id}">${query.name}</option>`);
+            });
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading saved queries:', error);
+        }
+    });
+}
+
+function loadUsers() {
+    $.ajax({
+        url: '/api/users',
+        type: 'GET',
+        success: function(users) {
+            const $select = $('#recipients');
+            $select.empty();
+            
+            users.forEach(function(user) {
+                $select.append(`<option value="${user.id}">${user.username} (${user.email})</option>`);
+            });
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading users:', error);
+        }
+    });
+}
+
+function resetAlertForm() {
+    $('#alertForm')[0].reset();
+    $('#alertId').val('');
+    $('#condition').val('has_results').trigger('change');
+    $('#recipients').val([]);
+}
+
+function editAlert(alertId) {
+    $.ajax({
+        url: `/api/alerts/${alertId}`,
+        type: 'GET',
+        success: function(alert) {
+            // Populate form
+            $('#alertId').val(alert.id);
+            $('#alertName').val(alert.name);
+            $('#alertDescription').val(alert.description);
+            $('#queryId').val(alert.query_id);
+            $('#condition').val(alert.condition).trigger('change');
+            $('#threshold').val(alert.threshold);
+            $('#status').val(alert.status);
+            $('#frequency').val(alert.frequency);
+            $('#timespan').val(alert.timespan);
+            $('#recipients').val(alert.recipients);
+            
+            // Show modal
+            $('#alertModalLabel').text('Edit Alert');
+            $('#alertModal').modal('show');
+        },
+        error: function(xhr, status, error) {
+            console.error('Error loading alert for editing:', error);
+            alert('Error loading alert: ' + xhr.responseJSON?.error || error);
+        }
+    });
+}
+
+function saveAlert() {
+    // Get form data
+    const alertId = $('#alertId').val();
+    const alertData = {
+        name: $('#alertName').val(),
+        description: $('#alertDescription').val(),
+        query_id: $('#queryId').val(),
+        condition: $('#condition').val(),
+        threshold: $('#threshold').val() || null,
+        status: $('#status').val(),
+        frequency: parseInt($('#frequency').val()),
+        timespan: parseInt($('#timespan').val()),
+        recipients: $('#recipients').val() || []
+    };
+    
+    // Validate
+    if (!alertData.name || !alertData.query_id) {
+        alert('Alert name and query are required');
+        return;
+    }
+    
+    // Check if threshold is required based on condition
+    if (alertData.condition !== 'has_results' && alertData.threshold === null) {
+        alert('Threshold value is required for this condition');
+        return;
+    }
+    
+    // Send to server
+    const url = alertId ? `/api/alerts/${alertId}` : '/api/alerts';
+    const method = alertId ? 'PUT' : 'POST';
+    
+    $.ajax({
+        url: url,
+        type: method,
+        contentType: 'application/json',
+        data: JSON.stringify(alertData),
+        success: function(response) {
+            // Close modal
+            $('#alertModal').modal('hide');
+            
+            // Reload alerts
+            loadAlerts();
+            loadAlertStats();
+            
+            // Show success message
+            alert(`Alert ${alertId ? 'updated' : 'created'} successfully`);
+        },
+        error: function(xhr, status, error) {
+            console.error('Error saving alert:', error);
+            alert('Error saving alert: ' + xhr.responseJSON?.error || error);
+        }
+    });
+}
+
+function deleteAlert(alertId) {
+    $.ajax({
+        url: `/api/alerts/${alertId}`,
+        type: 'DELETE',
+        success: function(response) {
+            // Reload alerts
+            loadAlerts();
+            loadAlertStats();
+            
+            // Show success message
+            alert('Alert deleted successfully');
+        },
+        error: function(xhr, status, error) {
+            console.error('Error deleting alert:', error);
+            alert('Error deleting alert: ' + xhr.responseJSON?.error || error);
+        }
+    });
+}
+
+function showAlertDetails(alertId, triggeredAlerts) {
+    // Find the triggered alert
+    const alert = triggeredAlerts.find(a => a.id === alertId);
+    if (!alert) {
+        console.error('Alert not found');
+        return;
+    }
+    
+    // Format date
+    const triggeredAt = new Date(alert.triggered_at).toLocaleString();
+    
+    // Create HTML for details
+    let html = `
+        <h4>${alert.alert_name}</h4>
+        <p>${alert.alert_description || 'No description'}</p>
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <p><strong>Triggered At:</strong> ${triggeredAt}</p>
+                <p><strong>Result Value:</strong> ${alert.result_value}</p>
+                <p><strong>Result Count:</strong> ${alert.result_count || 0}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Query:</strong> ${alert.query_name}</p>
+            </div>
+        </div>
+    `;
+    
+    // Add sample results if available
+    if (alert.details && alert.details.sample_rows && alert.details.sample_rows.length > 0) {
+        html += '<h5>Sample Results</h5>';
+        html += '<div class="table-responsive"><table class="table table-sm table-bordered">';
+        
+        // Add headers
+        if (alert.details.schema) {
+            html += '<thead><tr>';
+            alert.details.schema.forEach(column => {
+                html += `<th>${column.name || 'Unknown'}</th>`;
+            });
+            html += '</tr></thead>';
+        }
+        
+        // Add rows
+        html += '<tbody>';
+        alert.details.sample_rows.forEach(row => {
+            html += '<tr>';
+            row.forEach(cell => {
+                html += `<td>${cell}</td>`;
+            });
+            html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+    }
+    
+    // Display details
+    $('#alertDetailsContent').html(html);
+    $('#alertDetailsModal').modal('show');
+}
+
+function getConditionText(alert) {
+    switch (alert.condition) {
+        case 'has_results':
+            return 'Has Results';
+        case 'greater_than':
+            return `> ${alert.threshold}`;
+        case 'less_than':
+            return `< ${alert.threshold}`;
+        case 'equal_to':
+            return `= ${alert.threshold}`;
+        case 'not_equal_to':
+            return `≠ ${alert.threshold}`;
+        case 'contains':
+            return `Contains "${alert.threshold}"`;
+        default:
+            return alert.condition;
+    }
+}
+
+function updateCurrentTime() {
+    const now = new Date();
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+}
+
+// Update time every second
+setInterval(updateCurrentTime, 1000);
+updateCurrentTime(); // Initial call
+
+// Add auto-refresh functionality
+let refreshInterval = 30; // Default 30 seconds
+let refreshTimer;
+
+function startRefreshTimer() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(refreshData, refreshInterval * 1000);
+}
+
+function refreshData() {
+    // Add your data refresh logic here
+    loadAlertStats();
+    loadTriggeredAlerts();
+}
+
+document.getElementById('refreshInterval').addEventListener('change', function(e) {
+    refreshInterval = parseInt(e.target.value);
+    startRefreshTimer();
+});
+
+// Start the refresh timer
+startRefreshTimer();
+</script>
+{% endblock %} 

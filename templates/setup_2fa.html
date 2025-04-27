@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4">
+        <i class="bi bi-shield-lock"></i> 
+        {% if user.otp_enabled %}
+        Manage Two-Factor Authentication
+        {% else %}
+        Set Up Two-Factor Authentication
+        {% endif %}
+    </h1>
+    
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="alert alert-info">
+        <ul class="mb-0">
+            {% for message in messages %}
+            <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    {% endwith %}
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    {% if user.otp_enabled %}
+                    <h5 class="mb-0">Disable Two-Factor Authentication</h5>
+                    {% else %}
+                    <h5 class="mb-0">Enable Two-Factor Authentication</h5>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    {% if user.otp_enabled %}
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle-fill me-2"></i> Two-factor authentication is currently enabled for your account.
+                    </div>
+                    <p>To disable two-factor authentication, enter the verification code from your authenticator app and click "Disable 2FA".</p>
+                    <form method="post" action="{{ url_for('setup_2fa') }}">
+                        <div class="mb-3">
+                            <label for="otp_code" class="form-label">Verification Code</label>
+                            <input type="text" class="form-control" id="otp_code" name="otp_code" 
+                                   maxlength="6" required autocomplete="off"
+                                   pattern="[0-9]{6}" inputmode="numeric">
+                        </div>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-shield-x me-2"></i> Disable 2FA
+                        </button>
+                    </form>
+                    {% else %}
+                    <p>Two-factor authentication adds an extra layer of security to your account by requiring a verification code in addition to your password.</p>
+                    
+                    <div class="mb-4">
+                        <h5>1. Scan the QR code with your authenticator app:</h5>
+                        <div class="text-center my-4">
+                            <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="img-fluid" style="max-width: 200px;">
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <p class="mb-0"><strong>Can't scan the QR code?</strong> Enter this secret key manually:</p>
+                            <div class="mt-2 p-2 bg-light rounded user-select-all text-center" style="letter-spacing: 0.1em; font-family: monospace; word-break: break-all;">
+                                {{ secret }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>2. Enter the verification code from your app:</h5>
+                        <form method="post" action="{{ url_for('setup_2fa') }}">
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="otp_code" name="otp_code" 
+                                       maxlength="6" placeholder="000000" required autocomplete="off"
+                                       pattern="[0-9]{6}" inputmode="numeric">
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-shield-check me-2"></i> Verify and Enable 2FA
+                            </button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Recommended Authenticator Apps</h5>
+                </div>
+                <div class="card-body">
+                    <p>You can use any of these authentication apps:</p>
+                    <ul class="list-group">
+                        <li class="list-group-item d-flex align-items-center">
+                            <img src="https://play-lh.googleusercontent.com/HPc5gptPzRw3HDhAUF9OQb9Snqf88i8E_29sNtHM0mz1g6T8m3oIcKG9XHmpfEE_Zw" alt="Microsoft Authenticator" class="me-3" style="width: 48px; height: 48px;">
+                            <div>
+                                <h6 class="mb-0">Microsoft Authenticator</h6>
+                                <p class="text-muted mb-0 small">Available for iOS and Android</p>
+                                <div class="mt-1">
+                                    <a href="https://apps.apple.com/app/microsoft-authenticator/id983156458" target="_blank" class="btn btn-sm btn-outline-primary me-2">iOS</a>
+                                    <a href="https://play.google.com/store/apps/details?id=com.azure.authenticator" target="_blank" class="btn btn-sm btn-outline-success">Android</a>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-center">
+                            <img src="https://play-lh.googleusercontent.com/n33B01oV-otZcaQqbMGAvkQUYrIA5scmKTn2HVGkD_j7SS-wBVwQkdD3-DAmDby4XfU" alt="Google Authenticator" class="me-3" style="width: 48px; height: 48px;">
+                            <div>
+                                <h6 class="mb-0">Google Authenticator</h6>
+                                <p class="text-muted mb-0 small">Available for iOS and Android</p>
+                                <div class="mt-1">
+                                    <a href="https://apps.apple.com/app/google-authenticator/id388497605" target="_blank" class="btn btn-sm btn-outline-primary me-2">iOS</a>
+                                    <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2" target="_blank" class="btn btn-sm btn-outline-success">Android</a>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex align-items-center">
+                            <img src="https://play-lh.googleusercontent.com/Zs0XisZHA4jEDpp9vKOLdKY2Z5YznU_m_JbITPZy5YvKFBxPWxKcHME0FbUAOL3NmQ" alt="Authy" class="me-3" style="width: 48px; height: 48px;">
+                            <div>
+                                <h6 class="mb-0">Authy</h6>
+                                <p class="text-muted mb-0 small">Available for iOS, Android, and Desktop</p>
+                                <div class="mt-1">
+                                    <a href="https://apps.apple.com/app/authy/id494168017" target="_blank" class="btn btn-sm btn-outline-primary me-2">iOS</a>
+                                    <a href="https://play.google.com/store/apps/details?id=com.authy.authy" target="_blank" class="btn btn-sm btn-outline-success">Android</a>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="card mt-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i> Important</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Save your recovery codes!</strong> If you lose access to your authenticator app, you won't be able to log in to your account without recovery codes.</p>
+                    
+                    <p>Keep these codes in a safe place, separate from your authenticator app:</p>
+                    
+                    <ol>
+                        <li>Store them in a password manager</li>
+                        <li>Print them and keep them in a secure location</li>
+                        <li>Save them in an encrypted file</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('profile') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i> Back to Profile
+        </a>
+    </div>
+</div>
+{% endblock %} 

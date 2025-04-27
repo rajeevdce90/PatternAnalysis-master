@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="content-wrapper">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="bi bi-hdd-stack"></i> OpenSearch Connection
+                <small class="text-muted">Manage Connection Settings</small>
+            </h1>
+        </div>
+
+        <!-- Connection Settings Form -->
+        <div class="card">
+            <div class="card-body">
+                <form id="connectionSettingsForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="osHost" class="form-label">Host</label>
+                            <input type="text" class="form-control" id="osHost" placeholder="localhost" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="osPort" class="form-label">Port</label>
+                            <input type="number" class="form-control" id="osPort" placeholder="9200" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="osUsername" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="osUsername" placeholder="admin">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="osPassword" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="osPassword" placeholder="********">
+                        </div>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="osUseSsl">
+                        <label class="form-check-label" for="osUseSsl">
+                            Use SSL/HTTPS
+                        </label>
+                    </div>
+                     <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="osVerifyCerts" disabled>
+                        <label class="form-check-label" for="osVerifyCerts">
+                            Verify SSL Certificates (Requires SSL)
+                        </label>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="saveConnectionBtn">
+                        <i class="bi bi-save"></i> Save Settings
+                    </button>
+                     <button type="button" class="btn btn-secondary ms-2" id="testConnectionBtn">
+                        <i class="bi bi-plug"></i> Test Connection
+                    </button>
+                    <div id="connectionStatus" class="mt-3"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const hostInput = document.getElementById('osHost');
+    const portInput = document.getElementById('osPort');
+    const usernameInput = document.getElementById('osUsername');
+    const passwordInput = document.getElementById('osPassword');
+    const useSslInput = document.getElementById('osUseSsl');
+    const verifyCertsInput = document.getElementById('osVerifyCerts');
+    const saveBtn = document.getElementById('saveConnectionBtn');
+    const testBtn = document.getElementById('testConnectionBtn');
+    const statusDiv = document.getElementById('connectionStatus');
+
+    // Enable/disable verify certs based on SSL checkbox
+    useSslInput.addEventListener('change', () => {
+        verifyCertsInput.disabled = !useSslInput.checked;
+        if (!useSslInput.checked) {
+            verifyCertsInput.checked = false;
+        }
+    });
+
+    // Load current settings
+    function loadConnectionSettings() {
+        fetch('/api/admin/connections')
+            .then(response => {
+                if (!response.ok) throw new Error('Failed to load settings');
+                return response.json();
+            })
+            .then(settings => {
+                hostInput.value = settings.host || 'localhost';
+                portInput.value = settings.port || 9200;
+                usernameInput.value = settings.username || '';
+                // Don't pre-fill password for security
+                // passwordInput.value = settings.password || ''; 
+                useSslInput.checked = settings.use_ssl || false;
+                verifyCertsInput.checked = settings.verify_certs || false;
+                verifyCertsInput.disabled = !useSslInput.checked; 
+            })
+            .catch(error => {
+                console.error('Error loading connection settings:', error);
+                statusDiv.innerHTML = '<div class="alert alert-warning">Could not load existing settings.</div>';
+            });
+    }
+
+    // Save settings
+    saveBtn.addEventListener('click', () => {
+        const settings = {
+            host: hostInput.value,
+            port: parseInt(portInput.value, 10),
+            username: usernameInput.value,
+            password: passwordInput.value, // Send password only if changed or provided
+            use_ssl: useSslInput.checked,
+            verify_certs: verifyCertsInput.checked
+        };
+        
+        // Only include password if it's not empty
+        if (!settings.password) {
+            delete settings.password; 
+        }
+
+        statusDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Saving...</span></div> Saving...';
+
+        fetch('/api/admin/connections', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settings)
+        })
+        .then(response => response.json().then(data => ({ status: response.status, body: data })))
+        .then(({ status, body }) => {
+            if (status === 200) {
+                statusDiv.innerHTML = '<div class="alert alert-success">Settings saved successfully.</div>';
+                 // Clear password field after successful save
+                passwordInput.value = ''; 
+            } else {
+                 statusDiv.innerHTML = `<div class="alert alert-danger">Error saving settings: ${body.error || 'Unknown error'}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error saving settings:', error);
+            statusDiv.innerHTML = '<div class="alert alert-danger">Failed to save settings. Check console for details.</div>';
+        });
+    });
+    
+    // Test connection
+    testBtn.addEventListener('click', () => {
+        statusDiv.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Testing...</span></div> Testing connection...';
+        fetch('/api/admin/connections/test', { method: 'POST' }) // Assumes current settings are used
+             .then(response => response.json().then(data => ({ status: response.status, body: data })))
+             .then(({ status, body }) => {
+                  if (status === 200 && body.success) {
+                      statusDiv.innerHTML = `<div class="alert alert-success">Connection successful! Version: ${body.version}</div>`;
+                  } else {
+                      statusDiv.innerHTML = `<div class="alert alert-danger">Connection failed: ${body.error || 'Unknown error'}</div>`;
+                  }
+             })
+             .catch(error => {
+                 console.error('Error testing connection:', error);
+                 statusDiv.innerHTML = '<div class="alert alert-danger">Failed to test connection. Check console for details.</div>';
+             });
+    });
+
+    document.addEventListener('DOMContentLoaded', loadConnectionSettings);
+</script>
+{% endblock %} 

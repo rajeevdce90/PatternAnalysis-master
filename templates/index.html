@@ -1,0 +1,798 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="content-wrapper">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="bi bi-file-earmark-plus"></i> Add Data
+                <small class="text-muted">Choose your data source</small>
+            </h1>
+    </div>
+    
+        <!-- Data Source Options (Tabs) -->
+        <ul class="nav nav-tabs mb-3" id="addDataTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-pane" type="button" role="tab" aria-controls="upload-pane" aria-selected="true">
+                    <i class="bi bi-upload"></i> File Upload
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="rest-tab" data-bs-toggle="tab" data-bs-target="#rest-pane" type="button" role="tab" aria-controls="rest-pane" aria-selected="false">
+                    <i class="bi bi-cloud-arrow-down"></i> REST API Collector
+                </button>
+            </li>
+             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="syslog-tab" data-bs-toggle="tab" data-bs-target="#syslog-pane" type="button" role="tab" aria-controls="syslog-pane" aria-selected="false">
+                    <i class="bi bi-reception-4"></i> Syslog Input
+                </button>
+            </li>
+             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="hec-tab" data-bs-toggle="tab" data-bs-target="#hec-pane" type="button" role="tab" aria-controls="hec-pane" aria-selected="false">
+                    <i class="bi bi-input-cursor-text"></i> HEC Input
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="db-tab" data-bs-toggle="tab" data-bs-target="#db-pane" type="button" role="tab" aria-controls="db-pane" aria-selected="false">
+                    <i class="bi bi-server"></i> Database Connection
+                </button>
+            </li>
+            <!-- Add more tabs for future options here -->
+        </ul>
+
+        <div class="tab-content" id="addDataTabContent">
+            <!-- File Upload Pane -->
+            <div class="tab-pane fade show active" id="upload-pane" role="tabpanel" aria-labelledby="upload-tab">
+                <h4>Upload Log File</h4>
+                <p>Upload your log file (CSV or JSON). The analysis workflow will start automatically.</p>
+                <!-- Existing file upload form and subsequent workflow steps -->
+    <div class="workflow-container">
+        <div class="workflow-step active" id="step1">
+            <div class="step-content">
+                            <form id="uploadForm" enctype="multipart/form-data">
+                                <input type="file" id="logFile" class="form-control mb-3" accept=".csv, .json">
+                                <button type="submit" class="btn btn-primary">Upload and Analyze</button>
+                            </form>
+                            <div id="uploadStatus" class="alert alert-info mt-3" style="display: none;"></div>
+                    </div>
+                    </div>
+                    <div class="workflow-step" id="step2" style="display: none;">
+                        <div class="d-flex align-items-center mb-3">
+                <div class="step-number">2</div>
+                            <div class="step-title">Select Column for Pattern Analysis</div>
+            </div>
+            <div class="step-content">
+                            <p>Choose which column contains the log messages or patterns.</p>
+                            <select id="columnSelect" class="form-select mb-3"></select>
+                            <button id="generatePatternsBtn" class="btn btn-primary">Generate Patterns</button>
+                </div>
+            </div>
+                    <div class="workflow-step" id="step3" style="display: none;">
+                         <div class="d-flex align-items-center mb-3">
+                <div class="step-number">3</div>
+                            <div class="step-title">Review Events</div>
+            </div>
+            <div class="step-content">
+                            <p>Review the parsed events from your log file.</p>
+                            <div class="table-responsive events-container">
+                                <table class="table table-sm table-hover events-table" id="eventsTable">
+                                    <thead id="eventsHeader"></thead>
+                                    <tbody id="eventsBody"></tbody>
+                                </table>
+            </div>
+                            <div class="pagination mt-3" id="eventsPagination"></div>
+        </div>
+                    </div>
+                    <div class="workflow-step" id="step4" style="display: none;">
+                         <div class="d-flex align-items-center mb-3">
+                <div class="step-number">4</div>
+                            <div class="step-title">Analyze Patterns</div>
+            </div>
+            <div class="step-content">
+                             <p>Discovered patterns:</p>
+                            <div id="patternsContainer"></div>
+                            <button id="generateRegexBtn" class="btn btn-primary mt-3" style="display: none;">Generate Regex Patterns</button>
+                </div>
+            </div>
+                    </div>
+                </div>
+
+            <!-- REST API Collector Pane -->
+            <div class="tab-pane fade" id="rest-pane" role="tabpanel" aria-labelledby="rest-tab">
+                <h4>Configure REST API Collector</h4>
+                <p>Set up a collector to periodically fetch data from a REST API endpoint.</p>
+                <form id="restCollectorForm">
+                    <div class="mb-3">
+                        <label for="apiUrl" class="form-label">API Endpoint URL</label>
+                        <input type="url" class="form-control" id="apiUrl" placeholder="https://api.example.com/data" required>
+                    </div>
+                     <div class="row">
+                        <div class="col-md-6 mb-3">
+                             <label for="apiMethod" class="form-label">HTTP Method</label>
+                             <select id="apiMethod" class="form-select">
+                                 <option value="GET" selected>GET</option>
+                                 <option value="POST">POST</option>
+                             </select>
+                    </div>
+                         <div class="col-md-6 mb-3">
+                            <label for="pollInterval" class="form-label">Polling Interval (seconds)</label>
+                            <input type="number" class="form-control" id="pollInterval" value="300" min="60" required>
+                             <small class="text-muted">Minimum 60 seconds</small>
+                </div>
+            </div>
+                    <div class="mb-3">
+                        <label for="apiHeaders" class="form-label">Headers (JSON Format, Optional)</label>
+                        <textarea class="form-control" id="apiHeaders" rows="3" placeholder='{ "Content-Type": "application/json", "Authorization": "Bearer YOUR_TOKEN" }'></textarea>
+        </div>
+                    <div class="mb-3" id="apiBodyContainer" style="display: none;">
+                        <label for="apiBody" class="form-label">Request Body (JSON Format, Optional)</label>
+                        <textarea class="form-control" id="apiBody" rows="4" placeholder='{ "parameter": "value" }'></textarea>
+            </div>
+                     <!-- Future: Authentication options (e.g., Basic, Bearer Token) -->
+                    <button type="button" class="btn btn-primary" id="startCollectorBtn">
+                        <i class="bi bi-play-circle"></i> Start Collector
+                    </button>
+                    <div id="collectorStatus" class="mt-3"></div>
+                </form>
+            </div>
+
+            <!-- Syslog Input Pane -->
+            <div class="tab-pane fade" id="syslog-pane" role="tabpanel" aria-labelledby="syslog-tab">
+                <h4>Configure Syslog Input</h4>
+                <p>Set up a listener to receive Syslog messages directly.</p>
+                <form id="syslogForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="syslogPort" class="form-label">Listen Port</label>
+                            <input type="number" class="form-control" id="syslogPort" value="514" min="1" max="65535" required>
+                            <small class="text-muted">Standard Syslog port is 514.</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="syslogProtocol" class="form-label">Protocol</label>
+                            <select id="syslogProtocol" class="form-select">
+                                <option value="UDP" selected>UDP</option>
+                                <option value="TCP">TCP</option>
+                            </select>
+                             <small class="text-muted">Ensure your devices send logs using this protocol.</small>
+                        </div>
+                    </div>
+                    <!-- Future: Options for TLS, message format parsing -->
+                    <button type="button" class="btn btn-primary" id="startSyslogBtn">
+                        <i class="bi bi-play-circle"></i> Start Syslog Listener
+                    </button>
+                    <div id="syslogStatus" class="mt-3"></div>
+                </form>
+            </div>
+
+            <!-- HEC Input Pane -->
+            <div class="tab-pane fade" id="hec-pane" role="tabpanel" aria-labelledby="hec-tab">
+                <h4>Configure HEC (HTTP Event Collector) Input</h4>
+                <p>Set up an endpoint to receive data via HTTP POST requests, similar to Splunk HEC.</p>
+                <form id="hecForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="hecPort" class="form-label">Listen Port</label>
+                            <input type="number" class="form-control" id="hecPort" value="8088" min="1" max="65535" required>
+                            <small class="text-muted">Standard HEC port is 8088.</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                             <div class="form-check mt-4 pt-2">
+                                <input class="form-check-input" type="checkbox" id="hecUseHttps">
+                                <label class="form-check-label" for="hecUseHttps">
+                                    Enable HTTPS (Requires server-side certificate configuration)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="hecToken" class="form-label">HEC Token</label>
+                        <div class="input-group">
+                             <input type="text" class="form-control" id="hecToken" placeholder="Generate a token" readonly>
+                             <button class="btn btn-outline-secondary" type="button" id="generateHecTokenBtn">Generate</button>
+                        </div>
+                         <small class="text-muted">Clients must include this token in the 'Authorization: Splunk TOKEN_VALUE' header.</small>
+                    </div>
+                    
+                    <!-- Future: Options for index target, source type mapping -->
+                    <button type="button" class="btn btn-primary" id="startHecBtn">
+                        <i class="bi bi-play-circle"></i> Start HEC Listener
+                    </button>
+                     <div id="hecStatus" class="mt-3"></div>
+                </form>
+            </div>
+
+            <!-- Database Connection Pane -->
+            <div class="tab-pane fade" id="db-pane" role="tabpanel" aria-labelledby="db-tab">
+                <h4>Connect to Database</h4>
+                <p>Configure a connection to pull data directly from a database.</p>
+                <form id="dbConnectionForm">
+                     <div class="mb-3">
+                        <label for="dbConnectionName" class="form-label">Connection Name</label>
+                        <input type="text" class="form-control" id="dbConnectionName" placeholder="My Production DB" required>
+                         <small class="text-muted">A friendly name for this connection.</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="dbType" class="form-label">Database Type</label>
+                            <select id="dbType" class="form-select" required>
+                                <option value="" disabled selected>Select Type...</option>
+                                <option value="postgresql">PostgreSQL</option>
+                                <option value="mysql">MySQL</option>
+                                <option value="sqlserver">SQL Server</option>
+                                <option value="oracle">Oracle</option> 
+                                <!-- Add more DB types as needed -->
+                            </select>
+                        </div>
+                         <div class="col-md-6 mb-3">
+                             <label for="dbHost" class="form-label">Host</label>
+                            <input type="text" class="form-control" id="dbHost" placeholder="db.example.com" required>
+                        </div>
+                    </div>
+                     <div class="row">
+                         <div class="col-md-6 mb-3">
+                            <label for="dbPort" class="form-label">Port</label>
+                            <input type="number" class="form-control" id="dbPort" placeholder="e.g., 5432" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="dbName" class="form-label">Database Name</label>
+                            <input type="text" class="form-control" id="dbName" placeholder="e.g., logs_db" required>
+                        </div>
+                    </div>
+                     <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="dbUsername" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="dbUsername" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="dbPassword" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="dbPassword" required>
+                        </div>
+                    </div>
+                     <!-- Future: SSL options, connection pooling -->
+                     <button type="button" class="btn btn-secondary" id="testDbConnectionBtn">
+                        <i class="bi bi-plug"></i> Test Connection
+                    </button>
+                    <button type="button" class="btn btn-primary ms-2" id="saveDbConnectionBtn">
+                        <i class="bi bi-save"></i> Save Connection
+                    </button>
+                     <div id="dbConnectionStatus" class="mt-3"></div>
+                </form>
+                
+                <!-- Area to show saved DB connections (future enhancement) -->
+                 <hr class="my-4">
+                 <h5>Saved Connections</h5>
+                 <div id="savedDbConnectionsList"></div>
+            </div>
+            <!-- Add more tab panes for future options here -->
+        </div>
+    </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Existing scripts for file upload workflow -->
+    <script>
+// Global variables for file upload workflow
+let events = [];
+        let columns = [];
+let totalEvents = 0;
+let currentPage = 1;
+let itemsPerPage = 10;
+let patterns = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // File Upload Form submission handler
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        uploadFile();
+    });
+    
+    // Generate patterns button
+    document.getElementById('generatePatternsBtn').addEventListener('click', function() {
+        generatePatterns();
+    });
+    
+    // Initially hide workflow steps 2-4
+    // Handled by style="display: none;" inline now
+    
+    // REST API Collector specific logic
+    const apiMethodSelect = document.getElementById('apiMethod');
+    const apiBodyContainer = document.getElementById('apiBodyContainer');
+    
+    apiMethodSelect.addEventListener('change', function() {
+        apiBodyContainer.style.display = this.value === 'POST' ? 'block' : 'none';
+    });
+    
+    document.getElementById('startCollectorBtn').addEventListener('click', function() {
+        startRestCollector();
+    });
+
+    // Syslog Listener button
+    document.getElementById('startSyslogBtn').addEventListener('click', function() {
+        startSyslogListener();
+    });
+
+    // HEC Listener buttons
+    document.getElementById('startHecBtn').addEventListener('click', function() {
+        startHecListener();
+    });
+    document.getElementById('generateHecTokenBtn').addEventListener('click', function() {
+        generateHecToken();
+    });
+
+    // Database Connection buttons
+    document.getElementById('testDbConnectionBtn').addEventListener('click', function() {
+        testDbConnection();
+    });
+    document.getElementById('saveDbConnectionBtn').addEventListener('click', function() {
+        saveDbConnection();
+    });
+});
+
+// --- File Upload Workflow Functions --- 
+
+function uploadFile() {
+            const fileInput = document.getElementById('logFile');
+            const file = fileInput.files[0];
+    const uploadStatusDiv = document.getElementById('uploadStatus');
+    
+            if (!file) {
+        showMessage('Please select a file first', 'danger', uploadStatusDiv);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+    showMessage('Uploading and processing file...', 'info', uploadStatusDiv);
+    // Reset subsequent steps
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step3').style.display = 'none';
+    document.getElementById('step4').style.display = 'none';
+    document.getElementById('patternsContainer').innerHTML = ''; 
+    document.getElementById('generateRegexBtn').style.display = 'none';
+
+    fetch('/upload', { method: 'POST', body: formData })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            events = data.events;
+            columns = data.columns;
+            totalEvents = data.total_events;
+            currentPage = 1; // Reset page
+            
+            showMessage(`Successfully processed ${data.valid_events} out of ${data.total_events} events.`, 'success', uploadStatusDiv);
+            populateColumnSelect(columns);
+            showEventsPage(events);
+            
+            document.getElementById('step1').classList.remove('active');
+            document.getElementById('step1').classList.add('completed');
+            document.getElementById('step2').style.display = 'block';
+            document.getElementById('step2').classList.add('active');
+            document.getElementById('step3').style.display = 'block';
+                } else {
+            showMessage('Error: ' + data.error, 'danger', uploadStatusDiv);
+        }
+    })
+    .catch(error => {
+        showMessage('Error: ' + error.message, 'danger', uploadStatusDiv);
+    });
+}
+
+function showMessage(message, type, element) {
+    element.textContent = message;
+    element.className = `alert alert-${type} mt-3`;
+    element.style.display = 'block';
+}
+
+function populateColumnSelect(columns) {
+            const select = document.getElementById('columnSelect');
+    select.innerHTML = '<option value="">Select a column</option>';
+    columns.forEach(column => {
+                const option = document.createElement('option');
+        option.value = column.name;
+        option.textContent = `${column.name} (${column.type})`;
+                select.appendChild(option);
+            });
+        }
+
+function showEventsPage(filteredEvents) {
+    const headerRow = document.getElementById('eventsHeader');
+    const tableBody = document.getElementById('eventsBody');
+    headerRow.innerHTML = '';
+    tableBody.innerHTML = '';
+
+    if (columns.length > 0) {
+        columns.forEach(column => {
+            const th = document.createElement('th');
+            th.textContent = column.name;
+            headerRow.appendChild(th);
+        });
+    }
+
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = Math.min(start + itemsPerPage, filteredEvents.length);
+    
+    for (let i = start; i < end; i++) {
+        const event = filteredEvents[i];
+        const row = document.createElement('tr');
+        columns.forEach(column => {
+            const td = document.createElement('td');
+            td.textContent = event[column.name] !== undefined ? event[column.name] : '';
+            row.appendChild(td);
+        });
+        tableBody.appendChild(row);
+    }
+    createPagination(Math.ceil(filteredEvents.length / itemsPerPage), filteredEvents);
+}
+
+function createPagination(totalPages, dataSet) {
+    const paginationDiv = document.getElementById('eventsPagination');
+    paginationDiv.innerHTML = '';
+    if (totalPages <= 1) return; // No pagination if only one page
+
+    const createPageLink = (pageNum, text, isDisabled = false, isActive = false) => {
+        const li = document.createElement('li');
+        li.className = `page-item ${isDisabled ? 'disabled' : ''} ${isActive ? 'active' : ''}`;
+        const a = document.createElement('a');
+        a.className = 'page-link';
+        a.href = '#';
+        a.textContent = text;
+        if (!isDisabled) {
+            a.onclick = (e) => {
+                e.preventDefault();
+                currentPage = pageNum;
+                showEventsPage(dataSet);
+            };
+        }
+        li.appendChild(a);
+        return li;
+    };
+
+    const ul = document.createElement('ul');
+    ul.className = 'pagination justify-content-center';
+
+    ul.appendChild(createPageLink(currentPage - 1, 'Previous', currentPage === 1));
+
+    // Simplified pagination links (adjust as needed for more complex scenarios)
+    for (let i = 1; i <= totalPages; i++) {
+         if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+            ul.appendChild(createPageLink(i, i.toString(), false, i === currentPage));
+        } else if (i === currentPage - 2 || i === currentPage + 2) {
+             const li = document.createElement('li');
+             li.className = 'page-item disabled';
+             li.innerHTML = '<span class="page-link">...</span>';
+             ul.appendChild(li);
+        }
+    }
+
+    ul.appendChild(createPageLink(currentPage + 1, 'Next', currentPage === totalPages));
+    paginationDiv.appendChild(ul);
+}
+
+function generatePatterns() {
+    const selectedColumn = document.getElementById('columnSelect').value;
+    const uploadStatusDiv = document.getElementById('uploadStatus'); // Use upload status for messages
+
+    if (!selectedColumn) {
+        showMessage('Please select a column first.', 'warning', uploadStatusDiv);
+        return;
+    }
+
+    showMessage('Generating patterns...', 'info', uploadStatusDiv);
+
+    fetch('/generate_patterns', {
+                    method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column: selectedColumn })
+                })
+                .then(response => response.json())
+                .then(data => {
+        if (data.success) {
+            patterns = data.patterns;
+            displayPatterns(patterns);
+            showMessage('Patterns generated successfully.', 'success', uploadStatusDiv);
+            document.getElementById('step2').classList.remove('active');
+            document.getElementById('step2').classList.add('completed');
+            document.getElementById('step4').style.display = 'block';
+            document.getElementById('step4').classList.add('active');
+             document.getElementById('generateRegexBtn').style.display = 'block'; // Show regex button
+        } else {
+            showMessage('Error: ' + data.error, 'danger', uploadStatusDiv);
+        }
+                })
+                .catch(error => {
+        showMessage('Error: ' + error.message, 'danger', uploadStatusDiv);
+    });
+}
+
+function displayPatterns(patternsData) {
+    const container = document.getElementById('patternsContainer');
+    container.innerHTML = ''; // Clear previous patterns
+    if (!patternsData || patternsData.length === 0) {
+        container.innerHTML = '<p>No patterns found or generated.</p>';
+                return;
+            }
+            
+    const list = document.createElement('ul');
+    list.className = 'list-group';
+    patternsData.forEach((p, index) => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item';
+        li.innerHTML = `
+            <div><strong>Pattern ${index + 1}:</strong></div>
+            <pre class="mb-0">${p.pattern || 'N/A'}</pre>
+            <small class="text-muted">Example: ${p.example || 'N/A'}</small>
+        `;
+        list.appendChild(li);
+    });
+    container.appendChild(list);
+}
+
+// Placeholder for future generateRegex function
+// document.getElementById('generateRegexBtn').addEventListener('click', generateRegex);
+// function generateRegex() { console.log("Generate Regex called"); /* TODO */ }
+
+// --- REST API Collector Functions --- 
+
+function startRestCollector() {
+    const apiUrl = document.getElementById('apiUrl').value;
+    const apiMethod = document.getElementById('apiMethod').value;
+    const pollInterval = document.getElementById('pollInterval').value;
+    const apiHeaders = document.getElementById('apiHeaders').value;
+    const apiBody = document.getElementById('apiBody').value;
+    const collectorStatusDiv = document.getElementById('collectorStatus');
+
+    if (!apiUrl || !pollInterval) {
+        showMessage('API URL and Polling Interval are required.', 'warning', collectorStatusDiv);
+        return;
+    }
+
+    let headers = {};
+    try {
+        headers = apiHeaders ? JSON.parse(apiHeaders) : {};
+    } catch (e) {
+        showMessage('Invalid JSON in Headers field.', 'danger', collectorStatusDiv);
+        return;
+    }
+
+    let body = null;
+    if (apiMethod === 'POST' && apiBody) {
+        try {
+            body = JSON.parse(apiBody);
+        } catch (e) {
+            showMessage('Invalid JSON in Request Body field.', 'danger', collectorStatusDiv);
+            return;
+        }
+    }
+
+    const collectorConfig = {
+        url: apiUrl,
+        method: apiMethod,
+        interval: parseInt(pollInterval, 10),
+        headers: headers,
+        body: body
+    };
+
+    showMessage('Starting REST API collector...', 'info', collectorStatusDiv);
+
+    // TODO: Replace with actual API call to backend to start the collector
+    console.log("Collector Config:", collectorConfig);
+    // Simulating success/failure
+    setTimeout(() => {
+         // Replace with actual response check
+         const success = Math.random() > 0.3; // Simulate success/failure
+         if (success) {
+            showMessage('REST API collector started successfully.', 'success', collectorStatusDiv);
+            // Optionally clear the form or disable button
+         } else {
+             showMessage('Failed to start REST API collector. Check backend logs.', 'danger', collectorStatusDiv);
+         }
+     }, 1500); 
+    
+    // fetch('/api/collectors/rest', { // Example future endpoint
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify(collectorConfig)
+    // })
+    // .then(response => response.json())
+    // .then(data => {
+    //     if (data.success) {
+    //         showMessage('REST API collector started successfully.', 'success', collectorStatusDiv);
+    //     } else {
+    //         showMessage('Error: ' + data.error, 'danger', collectorStatusDiv);
+    //     }
+    // })
+    // .catch(error => {
+    //     showMessage('Error: ' + error.message, 'danger', collectorStatusDiv);
+    // });
+}
+
+// --- Syslog Input Functions --- 
+function startSyslogListener() {
+    const port = document.getElementById('syslogPort').value;
+    const protocol = document.getElementById('syslogProtocol').value;
+    const syslogStatusDiv = document.getElementById('syslogStatus');
+
+    if (!port) {
+        showMessage('Syslog Port is required.', 'warning', syslogStatusDiv);
+        return;
+    }
+
+    const syslogConfig = {
+        port: parseInt(port, 10),
+        protocol: protocol
+    };
+
+    showMessage('Starting Syslog listener...', 'info', syslogStatusDiv);
+
+    // TODO: Replace with actual API call to backend to start the listener
+    console.log("Syslog Config:", syslogConfig);
+    // Simulating success/failure
+    setTimeout(() => {
+         // Replace with actual response check
+         const success = Math.random() > 0.3; // Simulate success/failure
+         if (success) {
+            showMessage(`Syslog listener started successfully on ${protocol} port ${port}.`, 'success', syslogStatusDiv);
+            // Optionally disable button
+         } else {
+             showMessage('Failed to start Syslog listener. Check backend logs.', 'danger', syslogStatusDiv);
+         }
+     }, 1500);
+     
+    // fetch('/api/listeners/syslog', { // Example future endpoint
+    //     method: 'POST',
+    //     headers: { 'Content-Type': 'application/json' },
+    //     body: JSON.stringify(syslogConfig)
+    // })
+    // .then(response => response.json())
+    // .then(data => { // ... handle response ... })
+    // .catch(error => { // ... handle error ... });
+}
+
+// --- HEC Input Functions --- 
+function startHecListener() {
+    const port = document.getElementById('hecPort').value;
+    const useHttps = document.getElementById('hecUseHttps').checked;
+    const token = document.getElementById('hecToken').value;
+    const hecStatusDiv = document.getElementById('hecStatus');
+
+    if (!port) {
+        showMessage('HEC Port is required.', 'warning', hecStatusDiv);
+        return;
+    }
+     if (!token) {
+        showMessage('HEC Token must be generated first.', 'warning', hecStatusDiv);
+        return;
+    }
+
+    const hecConfig = {
+        port: parseInt(port, 10),
+        use_https: useHttps,
+        token: token // Token should ideally be managed/validated server-side
+    };
+
+    showMessage('Starting HEC listener...', 'info', hecStatusDiv);
+
+    // TODO: Replace with actual API call to backend to start the listener
+    console.log("HEC Config:", hecConfig);
+    // Simulating success/failure
+    setTimeout(() => {
+         const success = Math.random() > 0.3; 
+         if (success) {
+            showMessage(`HEC listener started successfully on port ${port} (${useHttps ? 'HTTPS' : 'HTTP'}).`, 'success', hecStatusDiv);
+         } else {
+             showMessage('Failed to start HEC listener. Check backend logs.', 'danger', hecStatusDiv);
+         }
+     }, 1500);
+     
+    // fetch('/api/listeners/hec', { ... });
+}
+
+function generateHecToken() {
+    const tokenInput = document.getElementById('hecToken');
+    const hecStatusDiv = document.getElementById('hecStatus');
+    showMessage('Generating HEC token...', 'info', hecStatusDiv);
+
+    // TODO: Replace with actual API call to backend to generate/retrieve a secure token
+    // For now, generating a simple UUID as a placeholder
+    const placeholderToken = crypto.randomUUID(); 
+    tokenInput.value = placeholderToken;
+    showMessage('Placeholder token generated. Use backend for secure tokens.', 'success', hecStatusDiv);
+    
+    // fetch('/api/hec/token', { method: 'POST' })
+    // .then(response => response.json())
+    // .then(data => {
+    //     if (data.success && data.token) {
+    //         tokenInput.value = data.token;
+    //         showMessage('HEC token generated/retrieved successfully.', 'success', hecStatusDiv);
+    //     } else {
+    //         showMessage('Failed to generate HEC token: ' + (data.error || 'Unknown error'), 'danger', hecStatusDiv);
+    //     }
+    // })
+    // .catch(error => {
+    //    showMessage('Error generating HEC token: ' + error.message, 'danger', hecStatusDiv);
+    // });
+}
+
+// --- Database Connection Functions --- 
+function testDbConnection() {
+    const dbConfig = getDbFormData();
+    const dbStatusDiv = document.getElementById('dbConnectionStatus');
+    
+    if (!dbConfig) return; // Validation failed
+
+    showMessage('Testing database connection...', 'info', dbStatusDiv);
+
+    // TODO: Replace with actual API call to backend to test connection
+    console.log("DB Test Config:", dbConfig);
+    // Simulating success/failure
+    setTimeout(() => {
+         const success = Math.random() > 0.3; 
+         if (success) {
+            showMessage(`Database connection to ${dbConfig.name} successful.`, 'success', dbStatusDiv);
+         } else {
+             showMessage('Failed to connect to database. Check details and network access.', 'danger', dbStatusDiv);
+         }
+     }, 1500);
+     
+    // fetch('/api/connections/db/test', { method: 'POST', body: JSON.stringify(dbConfig) ... });
+}
+
+function saveDbConnection() {
+    const dbConfig = getDbFormData();
+    const dbStatusDiv = document.getElementById('dbConnectionStatus');
+
+    if (!dbConfig) return; // Validation failed
+
+    showMessage('Saving database connection...', 'info', dbStatusDiv);
+
+    // TODO: Replace with actual API call to backend to save connection
+    console.log("DB Save Config:", dbConfig);
+    // Simulating success/failure
+    setTimeout(() => {
+         const success = Math.random() > 0.3; 
+         if (success) {
+            showMessage(`Database connection '${dbConfig.name}' saved successfully.`, 'success', dbStatusDiv);
+            // Optionally clear form or reload saved connections list
+            // loadSavedDbConnections(); 
+         } else {
+             showMessage('Failed to save database connection. Check backend logs.', 'danger', dbStatusDiv);
+         }
+     }, 1500);
+     
+    // fetch('/api/connections/db', { method: 'POST', body: JSON.stringify(dbConfig) ... });
+}
+
+function getDbFormData() {
+     const name = document.getElementById('dbConnectionName').value;
+     const type = document.getElementById('dbType').value;
+     const host = document.getElementById('dbHost').value;
+     const port = document.getElementById('dbPort').value;
+     const dbName = document.getElementById('dbName').value;
+     const username = document.getElementById('dbUsername').value;
+     const password = document.getElementById('dbPassword').value;
+     const dbStatusDiv = document.getElementById('dbConnectionStatus');
+
+    if (!name || !type || !host || !port || !dbName || !username || !password) {
+        showMessage('All database connection fields are required.', 'warning', dbStatusDiv);
+        return null;
+    }
+    
+    return {
+        name: name,
+        type: type,
+        host: host,
+        port: parseInt(port, 10),
+        database: dbName,
+        username: username,
+        password: password // Note: Sending password, ensure HTTPS and secure backend handling
+    };
+}
+
+// Placeholder for loading saved connections (future enhancement)
+// function loadSavedDbConnections() { ... }
+
+    </script>
+{% endblock %} 

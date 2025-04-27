@@ -1,0 +1,31 @@
+# Web Framework
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# Database and OpenSearch
+opensearch-py==2.3.1
+requests==2.31.0
+urllib3==2.0.7
+
+# Data Processing
+pandas==2.1.1
+numpy==1.24.3
+
+# Security and Authentication
+pyotp==2.9.0
+bcrypt==4.0.1
+qrcode==7.4.2
+Pillow==10.0.1  # Required for QR code generation
+
+# Email
+python-dotenv==1.0.0
+secure-smtplib==0.1.1
+
+# Utilities
+python-dateutil==2.8.2
+PyYAML==6.0.1
+
+# Development
+pytest==7.4.2
+black==23.9.1
+flake8==6.1.0 

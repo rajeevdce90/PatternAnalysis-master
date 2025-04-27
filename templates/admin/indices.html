@@ -1,0 +1,341 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="content-wrapper">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="bi bi-database-gear"></i> Index Management
+                <small class="text-muted">Manage OpenSearch Indices</small>
+            </h1>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createIndexModal">
+                <i class="bi bi-plus-circle"></i> Create Index
+            </button>
+        </div>
+
+        <!-- Indices Table -->
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="indicesTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Health</th>
+                                <th>Status</th>
+                                <th>Documents</th>
+                                <th>Size</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Indices will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Index Modal -->
+<div class="modal fade" id="createIndexModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Index</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createIndexForm">
+                    <div class="mb-3">
+                        <label class="form-label">Index Name</label>
+                        <input type="text" class="form-control" id="indexName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Settings (JSON)</label>
+                        <textarea class="form-control" id="indexSettings" rows="5" placeholder="{&#10;  &quot;number_of_shards&quot;: 1,&#10;  &quot;number_of_replicas&quot;: 1&#10;}"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Mappings (JSON)</label>
+                        <textarea class="form-control" id="indexMappings" rows="8" placeholder="{&#10;  &quot;properties&quot;: {&#10;    &quot;field1&quot;: { &quot;type&quot;: &quot;text&quot; },&#10;    &quot;field2&quot;: { &quot;type&quot;: &quot;keyword&quot; }&#10;  }&#10;}"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createIndexBtn">Create</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Index Info Modal -->
+<div class="modal fade" id="indexInfoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Index Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#settings">Settings</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#mappings">Mappings</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#stats">Stats</a>
+                    </li>
+                </ul>
+                <div class="tab-content mt-3">
+                    <div class="tab-pane fade show active" id="settings">
+                        <pre><code id="indexSettingsInfo"></code></pre>
+                    </div>
+                    <div class="tab-pane fade" id="mappings">
+                        <pre><code id="indexMappingsInfo"></code></pre>
+                    </div>
+                    <div class="tab-pane fade" id="stats">
+                        <table class="table">
+                            <tbody id="indexStatsInfo">
+                                <!-- Stats will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reindex Modal -->
+<div class="modal fade" id="reindexModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reindex Data</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="reindexForm">
+                    <div class="mb-3">
+                        <label class="form-label">Source Index</label>
+                        <input type="text" class="form-control" id="sourceIndex" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Target Index</label>
+                        <input type="text" class="form-control" id="targetIndex" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Query (Optional JSON)</label>
+                        <textarea class="form-control" id="reindexQuery" rows="5" placeholder="{&#10;  &quot;match&quot;: {&#10;    &quot;field&quot;: &quot;value&quot;&#10;  }&#10;}"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="reindexBtn">Start Reindex</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load indices on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadIndices();
+});
+
+// Load indices table
+function loadIndices() {
+    fetch('/api/indices')
+        .then(response => response.json())
+        .then(data => {
+            const tbody = document.querySelector('#indicesTable tbody');
+            tbody.innerHTML = '';
+            
+            data.forEach(index => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${index.name}</td>
+                    <td>
+                        <span class="badge bg-${getHealthColor(index.health)}">${index.health}</span>
+                    </td>
+                    <td>${index.status}</td>
+                    <td>${index.docs.toLocaleString()}</td>
+                    <td>${formatBytes(index.size)}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-info" onclick="showIndexInfo('${index.name}')">
+                                <i class="bi bi-info-circle"></i>
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="showReindexModal('${index.name}')">
+                                <i class="bi bi-arrow-left-right"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteIndex('${index.name}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading indices:', error);
+            showToast('error', 'Failed to load indices');
+        });
+}
+
+// Create index
+document.getElementById('createIndexBtn').addEventListener('click', function() {
+    const name = document.getElementById('indexName').value;
+    const settings = document.getElementById('indexSettings').value;
+    const mappings = document.getElementById('indexMappings').value;
+
+    fetch('/api/indices', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            name: name,
+            settings: settings ? JSON.parse(settings) : undefined,
+            mappings: mappings ? JSON.parse(mappings) : undefined
+        })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(response.statusText);
+        showToast('success', 'Index created successfully');
+        bootstrap.Modal.getInstance(document.getElementById('createIndexModal')).hide();
+        loadIndices();
+    })
+    .catch(error => {
+        console.error('Error creating index:', error);
+        showToast('error', 'Failed to create index');
+    });
+});
+
+// Show index info
+function showIndexInfo(name) {
+    fetch(`/api/indices/${name}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('indexSettingsInfo').textContent = 
+                JSON.stringify(data.settings, null, 2);
+            document.getElementById('indexMappingsInfo').textContent = 
+                JSON.stringify(data.mappings, null, 2);
+            
+            const statsTable = document.getElementById('indexStatsInfo');
+            statsTable.innerHTML = Object.entries(data.stats)
+                .map(([key, value]) => `
+                    <tr>
+                        <th>${formatKey(key)}</th>
+                        <td>${formatValue(key, value)}</td>
+                    </tr>
+                `).join('');
+            
+            new bootstrap.Modal(document.getElementById('indexInfoModal')).show();
+        })
+        .catch(error => {
+            console.error('Error loading index info:', error);
+            showToast('error', 'Failed to load index information');
+        });
+}
+
+// Show reindex modal
+function showReindexModal(sourceName) {
+    document.getElementById('sourceIndex').value = sourceName;
+    document.getElementById('targetIndex').value = '';
+    document.getElementById('reindexQuery').value = '';
+    new bootstrap.Modal(document.getElementById('reindexModal')).show();
+}
+
+// Start reindex
+document.getElementById('reindexBtn').addEventListener('click', function() {
+    const sourceIndex = document.getElementById('sourceIndex').value;
+    const targetIndex = document.getElementById('targetIndex').value;
+    const query = document.getElementById('reindexQuery').value;
+
+    fetch('/api/reindex', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            source_index: sourceIndex,
+            target_index: targetIndex,
+            query: query ? JSON.parse(query) : undefined
+        })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(response.statusText);
+        showToast('success', 'Reindex task started');
+        bootstrap.Modal.getInstance(document.getElementById('reindexModal')).hide();
+    })
+    .catch(error => {
+        console.error('Error starting reindex:', error);
+        showToast('error', 'Failed to start reindex task');
+    });
+});
+
+// Delete index
+function deleteIndex(name) {
+    if (!confirm(`Are you sure you want to delete the index "${name}"?`)) return;
+
+    fetch(`/api/indices/${name}`, {
+        method: 'DELETE'
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(response.statusText);
+        showToast('success', 'Index deleted successfully');
+        loadIndices();
+    })
+    .catch(error => {
+        console.error('Error deleting index:', error);
+        showToast('error', 'Failed to delete index');
+    });
+}
+
+// Helper functions
+function getHealthColor(health) {
+    switch (health.toLowerCase()) {
+        case 'green': return 'success';
+        case 'yellow': return 'warning';
+        case 'red': return 'danger';
+        default: return 'secondary';
+    }
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatKey(key) {
+    return key.split('_').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+}
+
+function formatValue(key, value) {
+    if (key.includes('size')) return formatBytes(value);
+    if (typeof value === 'number') return value.toLocaleString();
+    return value;
+}
+
+function showToast(type, message) {
+    // Assuming you have a toast notification system
+    console.log(`${type}: ${message}`);
+}
+</script>
+{% endblock %} 

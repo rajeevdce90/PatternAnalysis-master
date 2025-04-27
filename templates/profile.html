@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="mb-4"><i class="bi bi-person-circle"></i> User Profile</h1>
+    
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+    <div class="alert alert-success">
+        <ul class="mb-0">
+            {% for message in messages %}
+            <li>{{ message }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    {% endwith %}
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Profile Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <div class="avatar-placeholder mb-3">
+                            <i class="bi bi-person-circle" style="font-size: 5rem; color: #6c757d;"></i>
+                        </div>
+                        <h3>{{ user.username }}</h3>
+                        <p class="text-muted">{{ role_name }}</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <form method="post" action="{{ url_for('update_email') }}" id="emailForm">
+                            <label class="form-label text-muted">Email</label>
+                            <div class="input-group">
+                                <input type="email" class="form-control" id="email" name="email" value="{{ user.email }}" required>
+                                <button class="btn btn-outline-primary" type="submit">Update</button>
+                            </div>
+                            <div class="form-text">This email will be used for account-related communications.</div>
+                        </form>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Account Created</label>
+                        <p>{{ user.created_at }}</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Status</label>
+                        {% if user.is_active %}
+                        <p><span class="badge bg-success">Active</span></p>
+                        {% else %}
+                        <p><span class="badge bg-danger">Inactive</span></p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Account Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        <a href="{{ url_for('change_password') }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between align-items-center">
+                                <div>
+                                    <i class="bi bi-key me-2"></i> Change Password
+                                </div>
+                                <i class="bi bi-chevron-right"></i>
+                            </div>
+                        </a>
+                        <a href="{{ url_for('setup_2fa') }}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between align-items-center">
+                                <div>
+                                    <i class="bi bi-shield-lock me-2"></i> Two-Factor Authentication
+                                </div>
+                                <div>
+                                    {% if user.otp_enabled %}
+                                    <span class="badge bg-success me-2">Enabled</span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark me-2">Disabled</span>
+                                    {% endif %}
+                                    <i class="bi bi-chevron-right"></i>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Access Information</h5>
+                </div>
+                <div class="card-body">
+                    <h6>Role: {{ role_name }}</h6>
+                    <p>Your account access is determined by your assigned role. Contact an administrator if you need additional access.</p>
+                    
+                    {% if user.is_active %}
+                    <div class="alert alert-success" role="alert">
+                        <i class="bi bi-check-circle-fill me-2"></i> Your account is active and in good standing.
+                    </div>
+                    {% else %}
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> Your account is currently inactive. Please contact an administrator.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,21 @@
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-danger" onclick="deleteQuery()">Delete Query</button>
+                <button type="button" class="btn btn-outline-primary" onclick="createAlert()">Create Alert</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="runQuery()">Run Query</button>
+            </div>
+
+// Function to create an alert for the current query
+function createAlert() {
+    if (!currentQueryId) return;
+    
+    // Store query ID in sessionStorage to be loaded on alerts page
+    sessionStorage.setItem('createAlertForQuery', currentQueryId);
+    
+    // Close the current modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('viewQueryModal'));
+    modal.hide();
+    
+    // Redirect to alerts page
+    window.location.href = "{{ url_for('alerts_page') }}";
+} 

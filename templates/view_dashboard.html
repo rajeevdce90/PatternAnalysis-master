@@ -1,0 +1,269 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="content-wrapper">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3">
+                <i class="bi bi-grid"></i> {{ dashboard.name }}
+                <small class="text-muted">{{ dashboard.description }}</small>
+            </h1>
+            <div class="btn-group">
+                <button class="btn btn-outline-secondary" onclick="refreshDashboard()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+                <button class="btn btn-outline-primary" onclick="editDashboard('{{ dashboard.id }}')">
+                    <i class="bi bi-pencil"></i> Edit
+                </button>
+            </div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="row" id="dashboardGrid">
+            <!-- Widgets will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<script>
+let refreshInterval;
+const gridLayout = '{{ dashboard.dashboard_layout }}';
+const refreshTime = {{ dashboard.refresh_interval or 0 }};
+const defaultVisualization = '{{ dashboard.default_visualization }}';
+
+$(document).ready(function() {
+    // Set up grid based on layout
+    setupGrid();
+    
+    // Load initial data
+    refreshDashboard();
+    
+    // Set up auto-refresh if enabled
+    if (refreshTime > 0) {
+        refreshInterval = setInterval(refreshDashboard, refreshTime * 1000);
+    }
+});
+
+function setupGrid() {
+    const $grid = $('#dashboardGrid');
+    $grid.empty();
+    
+    // Create grid based on layout
+    let columns;
+    switch(gridLayout) {
+        case '2x2':
+            columns = 2;
+            break;
+        case '3x2':
+            columns = 3;
+            break;
+        case '3x3':
+            columns = 3;
+            break;
+        default:
+            columns = 2;
+    }
+    
+    // Calculate column width
+    const colWidth = Math.floor(12 / columns);
+    
+    // Add widget containers
+    const query = {{ dashboard.query|tojson }};
+    
+    // Create a single widget that takes up the full width
+    const widget = `
+        <div class="col-md-${colWidth} mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <div class="widget-container" data-query="${query}">
+                        <!-- Widget content will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $grid.append(widget);
+}
+
+function refreshDashboard() {
+    // Execute the dashboard query
+    const query = {{ dashboard.query|tojson }};
+    
+    fetch('/execute_sql', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            query: query,
+            language: 'sql'  // Default to SQL
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateVisualization(data.data);
+        } else {
+            console.error('Query failed:', data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+function updateVisualization(data) {
+    const container = $('.widget-container')[0];
+    
+    // Clear existing content
+    $(container).empty();
+    
+    switch(defaultVisualization) {
+        case 'table':
+            createTable(container, data);
+            break;
+        case 'bar':
+            createBarChart(container, data);
+            break;
+        case 'line':
+            createLineChart(container, data);
+            break;
+        case 'pie':
+            createPieChart(container, data);
+            break;
+        default:
+            createTable(container, data);
+    }
+}
+
+function createTable(container, data) {
+    if (!data.schema || !data.datarows) return;
+    
+    const table = document.createElement('table');
+    table.className = 'table table-striped';
+    
+    // Create header
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    data.schema.forEach(col => {
+        const th = document.createElement('th');
+        th.textContent = col.name;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    // Create body
+    const tbody = document.createElement('tbody');
+    data.datarows.forEach(row => {
+        const tr = document.createElement('tr');
+        row.forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell;
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    
+    container.appendChild(table);
+}
+
+function createBarChart(container, data) {
+    const canvas = document.createElement('canvas');
+    container.appendChild(canvas);
+    
+    const ctx = canvas.getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.datarows.map(row => row[0]),
+            datasets: [{
+                label: data.schema[1].name,
+                data: data.datarows.map(row => row[1]),
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function createLineChart(container, data) {
+    const canvas = document.createElement('canvas');
+    container.appendChild(canvas);
+    
+    const ctx = canvas.getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.datarows.map(row => row[0]),
+            datasets: [{
+                label: data.schema[1].name,
+                data: data.datarows.map(row => row[1]),
+                borderColor: 'rgba(75, 192, 192, 1)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+function createPieChart(container, data) {
+    const canvas = document.createElement('canvas');
+    container.appendChild(canvas);
+    
+    const ctx = canvas.getContext('2d');
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: data.datarows.map(row => row[0]),
+            datasets: [{
+                data: data.datarows.map(row => row[1]),
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true
+        }
+    });
+}
+
+// Clean up on page unload
+window.onbeforeunload = function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+};
+</script>
+{% endblock %} 

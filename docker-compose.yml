@@ -1,0 +1,43 @@
+version: '3'
+services:
+  opensearch:
+    build:
+      context: .
+      dockerfile: opensearch.Dockerfile
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - 9200:9200
+      - 9600:9600
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    networks:
+      - opensearch-net
+
+  logstash:
+    image: opensearchproject/logstash-oss-with-opensearch-output-plugin:8.9.0
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./PA_logs_1000.csv:/data/pan.csv:ro
+    environment:
+      - "LS_JAVA_OPTS=-Xms512m -Xmx512m"
+    depends_on:
+      - opensearch
+    networks:
+      - opensearch-net
+
+networks:
+  opensearch-net:
+    driver: bridge
+
+volumes:
+  opensearch-data: 
