@@ -219,16 +219,16 @@
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item" href="{{ url_for('admin') }}">
-                                    <i class="bi bi-shield-lock"></i> Index Management
+                                <a class="dropdown-item" href="{{ url_for('indexes') }}">
+                                    <i class="bi bi-database"></i> Indexes
                                 </a>
                             </li>
-                            {% endif %}
                             <li>
                                 <a class="dropdown-item" href="{{ url_for('add_data') }}">
                                     <i class="bi bi-file-earmark-plus"></i> Add Data
                                 </a>
                             </li>
+                            {% endif %}
                             <li><hr class="dropdown-divider"></li>
                             <li>
                                 <a class="dropdown-item" href="{{ url_for('logout') }}">

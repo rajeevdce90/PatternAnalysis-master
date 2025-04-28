@@ -1022,25 +1022,38 @@ function getDbFormData() {
 // Placeholder for loading saved connections (future enhancement)
 // function loadSavedDbConnections() { ... }
 
-// Function to load available indices
-async function loadIndices(selectId) {
+// Function to load indices
+async function loadIndices(dropdownId) {
+    const dropdown = document.getElementById(dropdownId);
+    const statusDiv = document.getElementById(dropdownId + 'Status') || document.createElement('div');
+    
     try {
+        // Show loading state
+        dropdown.disabled = true;
+        dropdown.innerHTML = '<option value="">Loading indices...</option>';
+        
+        // Fetch indices from the backend
         const response = await fetch('/api/admin/indices');
-        if (!response.ok) throw new Error('Failed to fetch indices');
+        const data = await response.json();
         
-        const indices = await response.json();
-        const select = document.getElementById(selectId);
-        select.innerHTML = '<option value="">Select an index...</option>';
+        // Clear loading state
+        dropdown.innerHTML = '<option value="">Select an index...</option>';
         
-        indices.forEach(index => {
+        // Add indices to dropdown
+        data.indices.forEach(index => {
             const option = document.createElement('option');
             option.value = index.name;
             option.textContent = index.name;
-            select.appendChild(option);
+            dropdown.appendChild(option);
         });
     } catch (error) {
         console.error('Error loading indices:', error);
-        showToast('Failed to load indices', 'error');
+        dropdown.innerHTML = '<option value="">Error loading indices</option>';
+        if (statusDiv) {
+            showMessage('Failed to load indices. Please try again.', 'danger', statusDiv);
+        }
+    } finally {
+        dropdown.disabled = false;
     }
 }
 

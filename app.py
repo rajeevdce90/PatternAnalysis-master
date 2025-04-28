@@ -27,6 +27,8 @@ import qrcode
 from base64 import b64encode
 from utils.email_sender import email_sender
 from utils.alert_checker import alert_checker
+from opensearchpy import OpenSearch, RequestsHttpConnection
+from requests_aws4auth import AWS4Auth
 
 # Import User and Role directly from the models.py file
 # This avoids the circular import issue
@@ -36,6 +38,9 @@ models_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(models_module)
 User = models_module.User
 Role = models_module.Role
+
+# Initialize OpenSearch client
+opensearch_client = OpenSearchClient()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1753,68 +1758,173 @@ def admin_indices():
     return render_template('admin/indices.html')
 
 @app.route('/api/admin/indices', methods=['GET'])
-@admin_required
+@login_required
 def list_indices():
     try:
-        indices = opensearch_client.list_indices()
-        return jsonify(indices)
+        client = OpenSearchClient().get_client()
+        
+        # Get basic index info
+        indices = client.cat.indices(format='json')
+        
+        # Get detailed stats for each index
+        result = []
+        for index in indices:
+            index_name = index['index']
+            stats = client.indices.stats(index=index_name)
+            health = client.cluster.health(index=index_name)
+            
+            # Get mappings to extract data types
+            mappings = client.indices.get_mapping(index=index_name)
+            data_types = set()
+            if mappings[index_name]['mappings'].get('properties'):
+                for field in mappings[index_name]['mappings']['properties'].values():
+                    if field.get('type'):
+                        data_types.add(field['type'])
+            
+            result.append({
+                'name': index_name,
+                'health': health['status'],
+                'doc_count': stats['_all']['total']['docs']['count'],
+                'size_in_bytes': stats['_all']['total']['store']['size_in_bytes'],
+                'status': index.get('status', 'unknown'),
+                'data_types': list(data_types)
+            })
+        
+        return jsonify({
+            'success': True,
+            'indices': result
+        })
+        
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error listing indices: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Failed to list indices: {str(e)}'
+        }), 500
+
+@app.route('/api/admin/indices/<index_name>/details', methods=['GET'])
+@login_required
+def get_index_details(index_name):
+    try:
+        client = OpenSearchClient().get_client()
+        
+        # Get index settings and mappings
+        settings = client.indices.get_settings(index=index_name)
+        mappings = client.indices.get_mapping(index=index_name)
+        
+        # Extract data types from mappings
+        data_types = set()
+        if mappings[index_name]['mappings'].get('properties'):
+            for field in mappings[index_name]['mappings']['properties'].values():
+                if field.get('type'):
+                    data_types.add(field['type'])
+        
+        return jsonify({
+            'success': True,
+            'settings': settings[index_name]['settings'],
+            'mappings': mappings[index_name]['mappings'],
+            'datatypes': list(data_types)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting index details: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Failed to get index details: {str(e)}'
+        }), 500
 
 @app.route('/api/admin/indices', methods=['POST'])
-@admin_required
+@login_required
 def create_index():
     try:
         data = request.get_json()
-        name = data.get('name')
+        if not data:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+            
+        if not data.get('name'):
+            return jsonify({'success': False, 'message': 'Index name is required'}), 400
+        
+        index_name = data['name']
         settings = data.get('settings', {})
         mappings = data.get('mappings', {})
         
-        if not name:
-            return jsonify({'error': 'Index name is required'}), 400
-            
-        opensearch_client.create_index(name, settings, mappings)
-        return jsonify({'message': 'Index created successfully'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/indices/<name>', methods=['GET'])
-@admin_required
-def get_index_info(name):
-    try:
-        info = opensearch_client.get_index_info(name)
-        return jsonify(info)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/indices/<name>', methods=['DELETE'])
-@admin_required
-def delete_index(name):
-    try:
-        opensearch_client.delete_index(name)
-        return jsonify({'message': 'Index deleted successfully'})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/reindex', methods=['POST'])
-@admin_required
-def reindex():
-    try:
-        data = request.get_json()
-        source_index = data.get('source_index')
-        target_index = data.get('target_index')
-        query = data.get('query')
+        # Use the OpenSearchClient singleton
+        client = OpenSearchClient().get_client()
         
-        if not source_index or not target_index:
-            return jsonify({'error': 'Source and target indices are required'}), 400
+        # Check if index already exists
+        if client.indices.exists(index=index_name):
+            return jsonify({
+                'success': False, 
+                'message': f'Index {index_name} already exists'
+            }), 400
+        
+        # Create the index with settings and mappings
+        create_response = client.indices.create(
+            index=index_name,
+            body={
+                'settings': settings,
+                'mappings': mappings
+            }
+        )
+        
+        if create_response.get('acknowledged'):
+            return jsonify({
+                'success': True, 
+                'message': f'Index {index_name} created successfully'
+            })
+        else:
+            return jsonify({
+                'success': False, 
+                'message': 'Index creation was not acknowledged by OpenSearch'
+            }), 500
             
-        task_id = opensearch_client.reindex(source_index, target_index, query)
+    except Exception as e:
+        logger.error(f"Error creating index: {str(e)}")
         return jsonify({
-            'message': 'Reindex task started successfully',
-            'task_id': task_id
+            'success': False, 
+            'message': f'Failed to create index: {str(e)}'
+        }), 500
+
+@app.route('/api/admin/indices/<index_name>', methods=['DELETE'])
+@login_required
+def delete_index(index_name):
+    try:
+        client = OpenSearchClient().get_client()
+        client.indices.delete(index=index_name)
+        return jsonify({
+            'success': True,
+            'message': f'Index {index_name} deleted successfully'
         })
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error deleting index: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Failed to delete index: {str(e)}'
+        }), 500
+
+@app.route('/api/admin/indices/<index_name>', methods=['PUT'])
+@login_required
+def update_index_settings(index_name):
+    try:
+        data = request.get_json()
+        settings = data.get('settings', {})
+        
+        # Update the index settings
+        opensearch_client.indices.put_settings(
+            index=index_name,
+            body={'index': settings}
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Index {index_name} settings updated successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error updating index settings: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
 
 # --- Connection Settings API ---
 
@@ -1936,6 +2046,16 @@ def acknowledge_alert(alert_id):
     except Exception as e:
         logger.error(f"Error acknowledging alert: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/index_management')
+@login_required
+def index_management():
+    return render_template('index_management.html')
+
+@app.route('/indexes')
+@login_required
+def indexes():
+    return render_template('indexes.html')
 
 if __name__ == '__main__':
     app.run(host='localhost', port=5000, debug=True) 

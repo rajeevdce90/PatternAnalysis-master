@@ -1,0 +1,399 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>OpenSearch Indexes</h2>
+        <button class="btn btn-primary" onclick="showCreateIndexModal()">
+            <i class="bi bi-plus-circle"></i> Create New Index
+        </button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Index Name</th>
+                    <th>Health</th>
+                    <th>Status</th>
+                    <th>Documents</th>
+                    <th>Size</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="indexList">
+                <!-- Index data will be populated here -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create Index Modal -->
+<div class="modal fade" id="createIndexModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create New Index</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createIndexForm">
+                    <div class="mb-3">
+                        <label class="form-label">Index Name</label>
+                        <input type="text" class="form-control" id="newIndexName" required 
+                               pattern="[a-z0-9][a-z0-9_-]*" 
+                               title="Index name must start with a letter or number and can contain lowercase letters, numbers, hyphens, and underscores">
+                        <div class="form-text">
+                            Lowercase letters, numbers, hyphens, and underscores only. Must start with a letter or number.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Number of Shards</label>
+                        <input type="number" class="form-control" id="newNumberOfShards" value="1" min="1" required>
+                        <div class="form-text">
+                            Number of primary shards in the index.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Number of Replicas</label>
+                        <input type="number" class="form-control" id="newNumberOfReplicas" value="1" min="0" required>
+                        <div class="form-text">
+                            Number of replicas for each primary shard.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Refresh Interval (seconds)</label>
+                        <input type="number" class="form-control" id="newRefreshInterval" value="1" min="1" required>
+                        <div class="form-text">
+                            How often to refresh the index, making new data searchable.
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6>Advanced Settings</h6>
+                        <div class="mb-3">
+                            <label class="form-label">Max Number of Fields</label>
+                            <input type="number" class="form-control" id="newMaxNumberOfFields" value="1000" min="100" required>
+                            <div class="form-text">
+                                Maximum number of fields in the index.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Max Result Window</label>
+                            <input type="number" class="form-control" id="newMaxResultWindow" value="10000" min="1000" required>
+                            <div class="form-text">
+                                Maximum number of documents returned in a single search request.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Mapping Template (Optional)</label>
+                        <textarea class="form-control" id="newMapping" rows="5" placeholder='{
+  "properties": {
+    "field_name": {
+      "type": "keyword"
+    }
+  }
+}'></textarea>
+                        <div class="form-text">
+                            JSON format. Leave empty for dynamic mapping.
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createIndex()">Create Index</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Index Properties Modal -->
+<div class="modal fade" id="indexPropertiesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Index Properties</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="indexPropertiesForm">
+                    <input type="hidden" id="currentIndexName">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Index Name</label>
+                        <input type="text" class="form-control" id="displayIndexName" disabled>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Number of Shards</label>
+                        <input type="number" class="form-control" id="numberOfShards" min="1">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Number of Replicas</label>
+                        <input type="number" class="form-control" id="numberOfReplicas" min="0">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Max Size per Shard (GB)</label>
+                        <input type="number" class="form-control" id="maxSizePerShard" min="1" step="1">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Max Number of Fields</label>
+                        <input type="number" class="form-control" id="maxNumberOfFields" min="100">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Refresh Interval (seconds)</label>
+                        <input type="number" class="form-control" id="refreshInterval" min="1">
+                    </div>
+
+                    <div class="alert alert-info">
+                        Note: Some changes may require reindexing and might affect performance.
+                    </div>
+
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-danger mb-1">Danger Zone</h6>
+                            <p class="text-muted small mb-0">This action cannot be undone.</p>
+                        </div>
+                        <button type="button" class="btn btn-outline-danger" onclick="showDeleteConfirm()">
+                            <i class="bi bi-trash"></i> Delete Index
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="saveIndexProperties()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the index <strong id="deleteIndexName"></strong>?</p>
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Warning: This action cannot be undone. All data in this index will be permanently deleted.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="cancelDelete()">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDeleteIndex()">Delete Index</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadIndexes();
+});
+
+function loadIndexes() {
+    fetch('/api/admin/indices')
+        .then(response => response.json())
+        .then(data => {
+            const indexList = document.getElementById('indexList');
+            indexList.innerHTML = '';
+            
+            data.indices.forEach(index => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index.name}</td>
+                    <td><span class="badge bg-${index.health === 'green' ? 'success' : index.health === 'yellow' ? 'warning' : 'danger'}">${index.health}</span></td>
+                    <td>${index.status}</td>
+                    <td>${index.doc_count}</td>
+                    <td>${formatBytes(index.size_in_bytes)}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="viewIndexProperties('${index.name}')">
+                            <i class="bi bi-gear"></i> Properties
+                        </button>
+                    </td>
+                `;
+                indexList.appendChild(row);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading indexes:', error);
+        });
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function viewIndexProperties(indexName) {
+    document.getElementById('currentIndexName').value = indexName;
+    document.getElementById('displayIndexName').value = indexName;
+    
+    fetch(`/api/admin/indices/${indexName}/details`)
+        .then(response => response.json())
+        .then(data => {
+            const settings = data.settings.index;
+            
+            document.getElementById('numberOfShards').value = settings.number_of_shards || 1;
+            document.getElementById('numberOfReplicas').value = settings.number_of_replicas || 0;
+            document.getElementById('maxSizePerShard').value = parseInt((settings.max_size_per_shard || '50gb').replace('gb', ''));
+            document.getElementById('maxNumberOfFields').value = settings.mapping?.total_fields?.limit || 1000;
+            document.getElementById('refreshInterval').value = parseInt((settings.refresh_interval || '1s').replace('s', ''));
+            
+            new bootstrap.Modal(document.getElementById('indexPropertiesModal')).show();
+        })
+        .catch(error => {
+            console.error('Error fetching index properties:', error);
+            alert('Error loading index properties. Please try again.');
+        });
+}
+
+function saveIndexProperties() {
+    const indexName = document.getElementById('currentIndexName').value;
+    const settings = {
+        number_of_shards: parseInt(document.getElementById('numberOfShards').value),
+        number_of_replicas: parseInt(document.getElementById('numberOfReplicas').value),
+        max_size_per_shard: document.getElementById('maxSizePerShard').value + 'gb',
+        'mapping.total_fields.limit': parseInt(document.getElementById('maxNumberOfFields').value),
+        refresh_interval: document.getElementById('refreshInterval').value + 's'
+    };
+
+    fetch(`/api/admin/indices/${indexName}`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ settings: settings })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Index properties updated successfully');
+            bootstrap.Modal.getInstance(document.getElementById('indexPropertiesModal')).hide();
+            loadIndexes();
+        } else {
+            alert('Error updating index properties: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error saving index properties:', error);
+        alert('Error saving index properties. Please try again.');
+    });
+}
+
+function showDeleteConfirm() {
+    const indexName = document.getElementById('currentIndexName').value;
+    document.getElementById('deleteIndexName').textContent = indexName;
+    bootstrap.Modal.getInstance(document.getElementById('indexPropertiesModal')).hide();
+    new bootstrap.Modal(document.getElementById('deleteConfirmModal')).show();
+}
+
+function cancelDelete() {
+    bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+    new bootstrap.Modal(document.getElementById('indexPropertiesModal')).show();
+}
+
+function confirmDeleteIndex() {
+    const indexName = document.getElementById('currentIndexName').value;
+    
+    fetch(`/api/admin/indices/${indexName}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Index deleted successfully');
+            bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+            loadIndexes();
+        } else {
+            alert('Error deleting index: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting index:', error);
+        alert('Error deleting index. Please try again.');
+    });
+}
+
+function showCreateIndexModal() {
+    new bootstrap.Modal(document.getElementById('createIndexModal')).show();
+}
+
+function createIndex() {
+    const indexName = document.getElementById('newIndexName').value.trim();
+    if (!indexName) {
+        alert('Index name is required');
+        return;
+    }
+
+    // Validate index name format
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(indexName)) {
+        alert('Invalid index name format. Use lowercase letters, numbers, hyphens, and underscores only. Must start with a letter or number.');
+        return;
+    }
+
+    let mappingJson = {};
+    const mappingText = document.getElementById('newMapping').value.trim();
+    if (mappingText) {
+        try {
+            mappingJson = JSON.parse(mappingText);
+        } catch (e) {
+            alert('Invalid JSON in mapping template');
+            return;
+        }
+    }
+
+    const settings = {
+        number_of_shards: parseInt(document.getElementById('newNumberOfShards').value),
+        number_of_replicas: parseInt(document.getElementById('newNumberOfReplicas').value),
+        refresh_interval: document.getElementById('newRefreshInterval').value + 's',
+        'mapping.total_fields.limit': parseInt(document.getElementById('newMaxNumberOfFields').value),
+        'max_result_window': parseInt(document.getElementById('newMaxResultWindow').value)
+    };
+
+    fetch('/api/admin/indices', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            name: indexName,
+            settings: settings,
+            mappings: mappingJson
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Index created successfully');
+            bootstrap.Modal.getInstance(document.getElementById('createIndexModal')).hide();
+            loadIndexes();
+        } else {
+            alert('Error creating index: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error creating index:', error);
+        alert('Error creating index. Please try again.');
+    });
+}
+</script>
+{% endblock %} 
