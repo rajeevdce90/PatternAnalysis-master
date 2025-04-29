@@ -1758,7 +1758,6 @@ def admin_indices():
     return render_template('admin/indices.html')
 
 @app.route('/api/admin/indices', methods=['GET'])
-@login_required
 def list_indices():
     try:
         client = OpenSearchClient().get_client()

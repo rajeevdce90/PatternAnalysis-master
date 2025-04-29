@@ -413,12 +413,15 @@ let itemsPerPage = 10;
 let patterns = [];
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Load indices for all input types on page load
+    // Load indices for all dropdowns on page load
     loadIndices('targetIndex');
     loadIndices('restTargetIndex');
     loadIndices('syslogTargetIndex');
-    loadIndices('hecTargetIndex');
-    loadIndices('dbTargetIndex');
+    
+    // Add click handlers for refresh buttons
+    document.getElementById('refreshIndices').addEventListener('click', function() {
+        loadIndices('targetIndex');
+    });
     
     // File Upload Form submission handler
     document.getElementById('uploadForm').addEventListener('submit', function(e) {
@@ -511,9 +514,6 @@ document.addEventListener('DOMContentLoaded', function() {
         saveDbConnection();
     });
 
-    // Refresh indices button
-    document.getElementById('refreshIndices').addEventListener('click', loadIndices);
-    
     // New index form submission
     document.getElementById('newIndexForm').addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -538,6 +538,29 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+
+function loadIndices(selectId) {
+    fetch('/api/admin/indices')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById(selectId);
+            // Clear existing options except the first one
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+            
+            // Add new options
+            data.indices.forEach(index => {
+                const option = document.createElement('option');
+                option.value = index.name;
+                option.textContent = index.name;
+                select.appendChild(option);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading indices:', error);
+        });
+}
 
 // --- File Upload Workflow Functions --- 
 
@@ -1021,41 +1044,6 @@ function getDbFormData() {
 
 // Placeholder for loading saved connections (future enhancement)
 // function loadSavedDbConnections() { ... }
-
-// Function to load indices
-async function loadIndices(dropdownId) {
-    const dropdown = document.getElementById(dropdownId);
-    const statusDiv = document.getElementById(dropdownId + 'Status') || document.createElement('div');
-    
-    try {
-        // Show loading state
-        dropdown.disabled = true;
-        dropdown.innerHTML = '<option value="">Loading indices...</option>';
-        
-        // Fetch indices from the backend
-        const response = await fetch('/api/admin/indices');
-        const data = await response.json();
-        
-        // Clear loading state
-        dropdown.innerHTML = '<option value="">Select an index...</option>';
-        
-        // Add indices to dropdown
-        data.indices.forEach(index => {
-            const option = document.createElement('option');
-            option.value = index.name;
-            option.textContent = index.name;
-            dropdown.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Error loading indices:', error);
-        dropdown.innerHTML = '<option value="">Error loading indices</option>';
-        if (statusDiv) {
-            showMessage('Failed to load indices. Please try again.', 'danger', statusDiv);
-        }
-    } finally {
-        dropdown.disabled = false;
-    }
-}
 
 // Function to create a new index
 async function createIndex(name, settings = {}) {
