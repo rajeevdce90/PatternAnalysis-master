@@ -1029,8 +1029,26 @@ function saveQuery() {
     const saveType = document.getElementById('saveType').value;
     const queryName = document.getElementById('queryName').value;
     const queryDescription = document.getElementById('queryDescription').value;
+    
+    if (!queryName) {
+        showAlert('danger', 'Query name is required');
+        return;
+    }
+    
+    // Get the active tab number
+    const activeTab = document.querySelector('#queryTabs .nav-link.active');
+    const tabNum = activeTab.id.replace('tab', '').replace('-tab', '');
     const activeQueryId = `sqlQuery${tabNum}`;
     const queryText = document.getElementById(activeQueryId).value;
+    
+    if (!queryText) {
+        showAlert('danger', 'Query text is required');
+        return;
+    }
+    
+    const saveButton = document.querySelector('#saveQueryModal .btn-primary');
+    saveButton.disabled = true;
+    saveButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...';
     
     let saveData = {
         name: queryName,
@@ -1040,15 +1058,38 @@ function saveQuery() {
     };
     
     if (saveType === 'alert') {
-        saveData.threshold = document.getElementById('alertThreshold').value;
+        const threshold = document.getElementById('alertThreshold').value;
+        const frequency = document.getElementById('alertFrequency').value;
+        
+        if (!threshold) {
+            showAlert('danger', 'Alert threshold is required');
+            resetSaveButton(saveButton);
+            return;
+        }
+        
+        if (!frequency || frequency < 1) {
+            showAlert('danger', 'Alert frequency must be at least 1 minute');
+            resetSaveButton(saveButton);
+            return;
+        }
+        
+        saveData.threshold = threshold;
         saveData.condition = document.getElementById('alertCondition').value;
-        saveData.frequency = document.getElementById('alertFrequency').value;
+        saveData.frequency = frequency;
     } else if (saveType === 'report') {
         saveData.schedule = document.getElementById('reportSchedule').value;
         saveData.format = document.getElementById('reportFormat').value;
     } else if (saveType === 'dashboard') {
+        const refreshInterval = document.getElementById('refreshInterval').value;
+        
+        if (!refreshInterval || refreshInterval < 5) {
+            showAlert('danger', 'Dashboard refresh interval must be at least 5 seconds');
+            resetSaveButton(saveButton);
+            return;
+        }
+        
         saveData.layout = document.getElementById('dashboardLayout').value;
-        saveData.refreshInterval = document.getElementById('refreshInterval').value;
+        saveData.refreshInterval = refreshInterval;
         saveData.defaultVisualization = document.getElementById('defaultVisualization').value;
     }
     
@@ -1062,33 +1103,57 @@ function saveQuery() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            $('#saveQueryModal').modal('hide');
+            const modal = bootstrap.Modal.getInstance(document.getElementById('saveQueryModal'));
+            modal.hide();
+            
             showAlert('success', 'Query saved successfully!');
             
             if (saveType === 'alert' && data.query_id) {
                 window.location.href = `/alerts?query_id=${data.query_id}`;
             }
         } else {
-            showAlert('error', data.error || 'Failed to save query');
+            showAlert('danger', data.error || 'Failed to save query');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        showAlert('error', 'Failed to save query');
+        showAlert('danger', 'Failed to save query');
+    })
+    .finally(() => {
+        resetSaveButton(saveButton);
     });
 }
 
+function resetSaveButton(button) {
+    button.disabled = false;
+    button.textContent = 'Save Query';
+}
+
 function showAlert(type, message) {
+    const alertContainer = document.createElement('div');
+    alertContainer.className = 'alert-container position-fixed top-0 end-0 p-3';
+    alertContainer.style.zIndex = '1050';
+    
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`;
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.role = 'alert';
     alertDiv.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     `;
-    document.querySelector('.col-12').insertBefore(alertDiv, document.querySelector('.card'));
+    
+    // Remove existing alert container if it exists
+    const existingContainer = document.querySelector('.alert-container');
+    if (existingContainer) {
+        existingContainer.remove();
+    }
+    
+    alertContainer.appendChild(alertDiv);
+    document.body.appendChild(alertContainer);
     
     setTimeout(() => {
-        alertDiv.remove();
+        alertDiv.classList.remove('show');
+        setTimeout(() => alertContainer.remove(), 150);
     }, 5000);
 }
 

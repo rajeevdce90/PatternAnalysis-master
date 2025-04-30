@@ -1,21 +1,401 @@
+{% extends "base.html" %}
+
+{% block head %}
+<!-- Prism.js for syntax highlighting -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css" rel="stylesheet" />
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
+<style>
+    .loading {
+        position: relative;
+        pointer-events: none;
+        opacity: 0.6;
+    }
+    .loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 1.5rem;
+        height: 1.5rem;
+        margin: -0.75rem 0 0 -0.75rem;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid var(--olympic-blue);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    #alertContainer {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+    }
+    .alert-float {
+        min-width: 300px;
+        margin-bottom: 10px;
+        animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="alertContainer"></div>
+
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col">
+            <h2>Saved Queries</h2>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <div class="input-group">
+                <input type="text" class="form-control" id="searchInput" placeholder="Search queries...">
+                <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="typeFilter">
+                <option value="">All Types</option>
+                <option value="query">Saved Query</option>
+                <option value="alert">Alert</option>
+                <option value="report">Report</option>
+                <option value="dashboard">Dashboard Widget</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="sortBy">
+                <option value="name">Sort by Name</option>
+                <option value="created">Sort by Created Date</option>
+                <option value="updated">Sort by Updated Date</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Type</th>
+                            <th>Created</th>
+                            <th>Last Updated</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="queriesTableBody">
+                        {% for query in queries %}
+                        <tr data-query-id="{{ query.id }}">
+                            <td>{{ query.name }}</td>
+                            <td>{{ query.description }}</td>
+                            <td><span class="badge bg-{{ query.type_class }}">{{ query.type }}</span></td>
+                            <td>{{ query.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>{{ query.updated_at.strftime('%Y-%m-%d %H:%M:%S') if query.updated_at else query.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            <td>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewQuery('{{ query.id }}')">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success" onclick="runQuery('{{ query.id }}')">
+                                        <i class="bi bi-play"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteQuery('{{ query.id }}')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if not queries %}
+            <div class="alert alert-info">No saved queries found.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- View Query Modal -->
+<div class="modal fade" id="viewQueryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Query Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-control" id="queryName" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" id="queryDescription" rows="2" readonly></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Query</label>
+                    <pre><code id="queryText" class="language-sql line-numbers"></code></pre>
+                </div>
+                <div id="queryOptions"></div>
+            </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-danger" onclick="deleteQuery()">Delete Query</button>
+                <button type="button" class="btn btn-outline-danger" onclick="deleteQuery(currentQueryId)">Delete</button>
                 <button type="button" class="btn btn-outline-primary" onclick="createAlert()">Create Alert</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="runQuery()">Run Query</button>
+                <button type="button" class="btn btn-primary" onclick="runQuery(currentQueryId)">Run Query</button>
             </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-// Function to create an alert for the current query
+{% block scripts %}
+<!-- Prism.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.js"></script>
+
+<script>
+let currentQueryId = null;
+
+function showAlert(type, message, duration = 5000) {
+    const alertContainer = document.getElementById('alertContainer');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-float alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    alertContainer.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        alertDiv.classList.remove('show');
+        setTimeout(() => alertDiv.remove(), 300);
+    }, duration);
+}
+
+function setLoading(element, isLoading) {
+    if (isLoading) {
+        element.classList.add('loading');
+        if (element.tagName === 'BUTTON') {
+            element.disabled = true;
+        }
+    } else {
+        element.classList.remove('loading');
+        if (element.tagName === 'BUTTON') {
+            element.disabled = false;
+        }
+    }
+}
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    filterQueries();
+}
+
+function filterQueries() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const typeFilter = document.getElementById('typeFilter').value;
+    const rows = document.getElementById('queriesTableBody').getElementsByTagName('tr');
+
+    for (let row of rows) {
+        const name = row.cells[0].textContent.toLowerCase();
+        const description = row.cells[1].textContent.toLowerCase();
+        const type = row.cells[2].textContent.toLowerCase();
+
+        const matchesSearch = name.includes(searchTerm) || description.includes(searchTerm);
+        const matchesType = !typeFilter || type === typeFilter;
+
+        row.style.display = matchesSearch && matchesType ? '' : 'none';
+    }
+}
+
+function sortQueries() {
+    const sortBy = document.getElementById('sortBy').value;
+    const tbody = document.getElementById('queriesTableBody');
+    const rows = Array.from(tbody.getElementsByTagName('tr'));
+
+    rows.sort((a, b) => {
+        let aValue, bValue;
+        switch (sortBy) {
+            case 'name':
+                aValue = a.cells[0].textContent;
+                bValue = b.cells[0].textContent;
+                break;
+            case 'created':
+                aValue = new Date(a.cells[3].textContent);
+                bValue = new Date(b.cells[3].textContent);
+                break;
+            case 'updated':
+                aValue = new Date(a.cells[4].textContent);
+                bValue = new Date(b.cells[4].textContent);
+                break;
+        }
+        return aValue > bValue ? 1 : -1;
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+async function viewQuery(queryId) {
+    const modal = document.getElementById('viewQueryModal');
+    setLoading(modal, true);
+    currentQueryId = queryId;
+    
+    try {
+        const response = await fetch(`/api/queries/${queryId}`);
+        if (!response.ok) throw new Error('Failed to fetch query details');
+        
+        const query = await response.json();
+        document.getElementById('queryName').value = query.name;
+        document.getElementById('queryDescription').value = query.description;
+        document.getElementById('queryText').textContent = query.query;
+        
+        // Update options based on query type
+        const optionsDiv = document.getElementById('queryOptions');
+        optionsDiv.innerHTML = '';
+        
+        if (query.type === 'alert') {
+            optionsDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Threshold</label>
+                        <input type="text" class="form-control" value="${query.threshold}" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Condition</label>
+                        <input type="text" class="form-control" value="${query.condition}" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Frequency (min)</label>
+                        <input type="text" class="form-control" value="${query.frequency}" readonly>
+                    </div>
+                </div>
+            `;
+        } else if (query.type === 'report') {
+            optionsDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Schedule</label>
+                        <input type="text" class="form-control" value="${query.schedule}" readonly>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Format</label>
+                        <input type="text" class="form-control" value="${query.format}" readonly>
+                    </div>
+                </div>
+            `;
+        } else if (query.type === 'dashboard') {
+            optionsDiv.innerHTML = `
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Layout</label>
+                        <input type="text" class="form-control" value="${query.layout}" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Refresh Interval</label>
+                        <input type="text" class="form-control" value="${query.refresh_interval}s" readonly>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Visualization</label>
+                        <input type="text" class="form-control" value="${query.visualization}" readonly>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Trigger Prism.js syntax highlighting
+        Prism.highlightAll();
+        
+        const modalInstance = new bootstrap.Modal(modal);
+        modalInstance.show();
+    } catch (error) {
+        console.error('Error fetching query:', error);
+        showAlert('danger', 'Failed to load query details');
+    } finally {
+        setLoading(modal, false);
+    }
+}
+
+async function runQuery(queryId) {
+    const button = event.target.closest('button');
+    setLoading(button, true);
+    
+    try {
+        const response = await fetch(`/api/queries/${queryId}/run`, { method: 'POST' });
+        if (!response.ok) throw new Error('Failed to run query');
+        
+        const result = await response.json();
+        if (result.redirect_url) {
+            window.location.href = result.redirect_url;
+        } else {
+            showAlert('success', 'Query executed successfully');
+        }
+    } catch (error) {
+        console.error('Error running query:', error);
+        showAlert('danger', 'Failed to run query');
+    } finally {
+        setLoading(button, false);
+    }
+}
+
+async function deleteQuery(queryId) {
+    if (!confirm('Are you sure you want to delete this query?')) return;
+    
+    const button = event.target.closest('button');
+    setLoading(button, true);
+    
+    try {
+        const response = await fetch(`/api/queries/${queryId}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to delete query');
+        
+        // Close modal if open
+        const modal = bootstrap.Modal.getInstance(document.getElementById('viewQueryModal'));
+        if (modal) modal.hide();
+        
+        // Remove row from table
+        const row = document.querySelector(`tr[data-query-id="${queryId}"]`);
+        if (row) {
+            row.style.animation = 'fadeOut 0.3s ease-out';
+            setTimeout(() => row.remove(), 300);
+        }
+        
+        showAlert('success', 'Query deleted successfully');
+    } catch (error) {
+        console.error('Error deleting query:', error);
+        showAlert('danger', 'Failed to delete query');
+    } finally {
+        setLoading(button, false);
+    }
+}
+
 function createAlert() {
     if (!currentQueryId) return;
-    
-    // Store query ID in sessionStorage to be loaded on alerts page
     sessionStorage.setItem('createAlertForQuery', currentQueryId);
-    
-    // Close the current modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('viewQueryModal'));
     modal.hide();
-    
-    // Redirect to alerts page
     window.location.href = "{{ url_for('alerts_page') }}";
-} 
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('searchInput').addEventListener('input', filterQueries);
+    document.getElementById('typeFilter').addEventListener('change', filterQueries);
+    document.getElementById('sortBy').addEventListener('change', sortQueries);
+});
+</script>
+{% endblock %}

@@ -29,6 +29,7 @@ from utils.email_sender import email_sender
 from utils.alert_checker import alert_checker
 from opensearchpy import OpenSearch, RequestsHttpConnection
 from requests_aws4auth import AWS4Auth
+from logging.handlers import RotatingFileHandler
 
 # Import User and Role directly from the models.py file
 # This avoids the circular import issue
@@ -926,48 +927,109 @@ def save_query():
         logger.error(f"Error in save_query: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/get_saved_queries')
+@app.route('/saved_queries')
 @login_required
-def get_saved_queries():
+def saved_queries():
     try:
-        queries = []
+        # Get user ID and check if admin
         user_id = session.get('user_id')
         user = User.get_user_by_id(user_id)
-        role = user.get_role() if user else None
+        is_admin = False
+        if user:
+            role = user.get_role()
+            is_admin = role and role.name == 'Administrator'
         
-        is_admin = role and role.name == 'Administrator'
+        # Get all saved queries
+        queries = []
+        if os.path.exists(SAVED_QUERIES_DIR):
+            for filename in os.listdir(SAVED_QUERIES_DIR):
+                if filename.endswith('.json'):
+                    file_path = os.path.join(SAVED_QUERIES_DIR, filename)
+                    with open(file_path, 'r') as f:
+                        query = json.load(f)
+                        # Only show queries if user is admin or query creator
+                        if is_admin or query.get('created_by') == user_id:
+                            query['id'] = filename.replace('.json', '')
+                            # Add type-specific styling class
+                            query['type_class'] = {
+                                'query': 'primary',
+                                'alert': 'warning',
+                                'report': 'info',
+                                'dashboard': 'success'
+                            }.get(query.get('type', 'query'), 'secondary')
+                            queries.append(query)
         
-        for filename in os.listdir(SAVED_QUERIES_DIR):
-            if filename.endswith('.json'):
-                with open(os.path.join(SAVED_QUERIES_DIR, filename), 'r') as f:
-                    query_data = json.load(f)
-                    
-                    # Filter queries based on tag access
-                    if is_admin or not query_data.get('tags'):
-                        # Admin can see all queries, or queries without tags are visible to all
-                        queries.append(query_data)
-                    else:
-                        # Check if user has access to any of the query's tags
-                        has_access = False
-                        for tag in query_data.get('tags', []):
-                            if role and tag in role.tag_access:
-                                has_access = True
-                                break
-                        
-                        # If created by the current user, always include
-                        if query_data.get('created_by') == user_id:
-                            has_access = True
-                            
-                        if has_access:
-                            queries.append(query_data)
+        # Sort queries by name
+        queries.sort(key=lambda x: x.get('name', '').lower())
         
-        # Sort by creation date (newest first)
-        queries.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        
-        return jsonify(queries)
-        
+        return render_template('saved_queries.html', queries=queries)
     except Exception as e:
-        logger.error(f"Error in get_saved_queries: {str(e)}")
+        logger.error(f"Error loading saved queries: {str(e)}")
+        flash('Error loading saved queries', 'danger')
+        return render_template('saved_queries.html', queries=[])
+
+@app.route('/api/queries/<query_id>')
+@login_required
+def get_query(query_id):
+    try:
+        # Get user ID and check if admin
+        user_id = session.get('user_id')
+        user = User.get_user_by_id(user_id)
+        is_admin = False
+        if user:
+            role = user.get_role()
+            is_admin = role and role.name == 'Administrator'
+        
+        # Get the query file
+        query_file = os.path.join(SAVED_QUERIES_DIR, f"{query_id}.json")
+        
+        # Check if the query exists
+        if not os.path.exists(query_file):
+            return jsonify({'error': 'Query not found'}), 404
+        
+        # Load query data
+        with open(query_file, 'r') as f:
+            query = json.load(f)
+        
+        # Check if user has permission to view this query
+        if not is_admin and query.get('created_by') != user_id:
+            return jsonify({'error': 'You do not have permission to view this query'}), 403
+        
+        query['id'] = query_id
+        return jsonify(query)
+    except Exception as e:
+        logger.error(f"Error getting query details: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/queries/<query_id>/run', methods=['POST'])
+@login_required
+def run_saved_query(query_id):
+    try:
+        # Get the query file
+        query_file = os.path.join(SAVED_QUERIES_DIR, f"{query_id}.json")
+        
+        # Check if the query exists
+        if not os.path.exists(query_file):
+            return jsonify({'error': 'Query not found'}), 404
+        
+        # Load query data
+        with open(query_file, 'r') as f:
+            query = json.load(f)
+        
+        # Store query in session for the target page
+        session['loaded_query'] = query
+        
+        # Redirect based on query type
+        if query.get('type') == 'alert':
+            return jsonify({'redirect_url': url_for('alerts_page')})
+        elif query.get('type') == 'report':
+            return jsonify({'redirect_url': url_for('reports')})
+        elif query.get('type') == 'dashboard':
+            return jsonify({'redirect_url': url_for('dashboards')})
+        else:
+            return jsonify({'redirect_url': url_for('sql_query')})
+    except Exception as e:
+        logger.error(f"Error running saved query: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/settings')
@@ -1181,11 +1243,6 @@ def update_queries_after_tag_delete(tag_id):
                         json.dump(query, f, indent=2)
     except Exception as e:
         logger.error(f"Error updating queries after tag delete: {str(e)}")
-
-@app.route('/saved_queries')
-@login_required
-def saved_queries():
-    return render_template('saved_queries.html')
 
 @app.route('/delete_query/<query_id>', methods=['DELETE'])
 @login_required
@@ -2057,4 +2114,27 @@ def indexes():
     return render_template('indexes.html')
 
 if __name__ == '__main__':
-    app.run(host='localhost', port=5000, debug=True) 
+    # Set up logging
+    if not os.path.exists('logs'):
+        os.mkdir('logs')
+    
+    file_handler = RotatingFileHandler(
+        'logs/pattern_analysis.log',
+        maxBytes=10240,
+        backupCount=10
+    )
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    app.logger.info('Pattern Analysis startup')
+    
+    # Run the app
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=True
+    ) 
