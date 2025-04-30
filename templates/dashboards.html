@@ -1,213 +1,384 @@
 {% extends 'base.html' %}
 
+{% block head %}
+<!-- Prism.js for syntax highlighting -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism.min.css" rel="stylesheet" />
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.css" rel="stylesheet" />
+<style>
+    .loading {
+        position: relative;
+        pointer-events: none;
+        opacity: 0.6;
+    }
+    .loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 1.5rem;
+        height: 1.5rem;
+        margin: -0.75rem 0 0 -0.75rem;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid var(--olympic-blue);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    #alertContainer {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+    }
+    .alert-float {
+        min-width: 300px;
+        margin-bottom: 10px;
+        animation: slideIn 0.3s ease-out;
+    }
+    @keyframes slideIn {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+    }
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+    .dashboard-card {
+        transition: all 0.3s ease;
+    }
+    .dashboard-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
+<div id="alertContainer"></div>
+
 <div class="container-fluid">
-    <div class="content-wrapper">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 class="h3">
-                <i class="bi bi-grid"></i> Dashboards
-                <small class="text-muted">Visual Analytics</small>
-            </h1>
-            <button class="btn btn-primary" id="createDashboardBtn">
-                <i class="bi bi-plus-circle"></i> Create Dashboard
-            </button>
-        </div>
-
-        <!-- Dashboard Categories -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="bi bi-shield"></i> Security</h5>
-                        <p class="card-text">Security metrics and threat analysis</p>
-                    </div>
-                </div>
+    <div class="row mb-3">
+        <div class="col">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>
+                    <i class="bi bi-grid"></i> Dashboards
+                    <small class="text-muted">Visual Analytics</small>
+                </h2>
+                <button class="btn btn-primary" onclick="window.location.href='{{ url_for('sql_query') }}';">
+                    <i class="bi bi-plus-circle"></i> Create Dashboard
+                </button>
             </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="bi bi-speedometer2"></i> Performance</h5>
-                        <p class="card-text">System and application performance metrics</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="bi bi-graph-up"></i> Analytics</h5>
-                        <p class="card-text">Business and user analytics</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title"><i class="bi bi-person"></i> Custom</h5>
-                        <p class="card-text">Your custom dashboards</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Dashboards Grid -->
-        <div class="row" id="dashboardsGrid">
-            <!-- Dashboard cards will be loaded here -->
         </div>
     </div>
+
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <div class="input-group">
+                <input type="text" class="form-control" id="searchInput" placeholder="Search dashboards...">
+                <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="categoryFilter">
+                <option value="">All Categories</option>
+                <option value="security">Security</option>
+                <option value="performance">Performance</option>
+                <option value="analytics">Analytics</option>
+                <option value="custom">Custom</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="layoutFilter">
+                <option value="">All Layouts</option>
+                <option value="full">Full Width</option>
+                <option value="half">Half Width</option>
+                <option value="third">One Third</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" id="sortBy">
+                <option value="name">Sort by Name</option>
+                <option value="created">Sort by Created Date</option>
+                <option value="updated">Sort by Updated Date</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row" id="dashboardsGrid">
+        {% for dashboard in dashboards %}
+        <div class="col-md-4 mb-4 dashboard-item" 
+             data-name="{{ dashboard.name|lower }}" 
+             data-category="{{ dashboard.category|default('custom')|lower }}"
+             data-layout="{{ dashboard.dashboard_layout|default('full')|lower }}"
+             data-created="{{ dashboard.created_at }}">
+            <div class="card h-100 dashboard-card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ dashboard.name }}</h5>
+                    <p class="card-text">{{ dashboard.description }}</p>
+                    <p class="text-muted">
+                        <small>
+                            Layout: {{ dashboard.dashboard_layout|default('Full') }}<br>
+                            Refresh: {{ dashboard.refresh_interval|default('No') }} seconds<br>
+                            Created: {{ dashboard.created_at }}
+                        </small>
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewDashboard('{{ dashboard.id }}')">
+                            <i class="bi bi-eye"></i> View
+                        </button>
+                        <button class="btn btn-sm btn-outline-success" onclick="runQuery('{{ dashboard.id }}')">
+                            <i class="bi bi-play"></i> Open
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteDashboard('{{ dashboard.id }}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if not dashboards %}
+    <div class="alert alert-info">No dashboards found. Create a dashboard to visualize your data.</div>
+    {% endif %}
 </div>
 
-<!-- Create/Edit Dashboard Modal -->
-<div class="modal fade" id="dashboardModal" tabindex="-1">
+<!-- View Dashboard Modal -->
+<div class="modal fade" id="viewDashboardModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Create Dashboard</h5>
+                <h5 class="modal-title">Dashboard Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <form id="dashboardForm">
-                    <div class="mb-3">
-                        <label class="form-label">Dashboard Name</label>
-                        <input type="text" class="form-control" id="dashboardName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" id="dashboardDescription" rows="3"></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Category</label>
-                        <select class="form-select" id="dashboardCategory" required>
-                            <option value="security">Security</option>
-                            <option value="performance">Performance</option>
-                            <option value="analytics">Analytics</option>
-                            <option value="custom">Custom</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
+                <div class="mb-3">
+                    <label class="form-label">Name</label>
+                    <input type="text" class="form-control" id="dashboardName" readonly>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea class="form-control" id="dashboardDescription" rows="2" readonly></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Query</label>
+                    <pre><code id="dashboardQuery" class="language-sql line-numbers"></code></pre>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-4">
                         <label class="form-label">Layout</label>
-                        <select class="form-select" id="dashboardLayout" required>
-                            <option value="2x2">2x2 Grid</option>
-                            <option value="3x2">3x2 Grid</option>
-                            <option value="3x3">3x3 Grid</option>
-                            <option value="custom">Custom Layout</option>
-                        </select>
+                        <input type="text" class="form-control" id="dashboardLayout" readonly>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Auto-refresh Interval</label>
-                        <select class="form-select" id="dashboardRefresh">
-                            <option value="0">No auto-refresh</option>
-                            <option value="30">30 seconds</option>
-                            <option value="60">1 minute</option>
-                            <option value="300">5 minutes</option>
-                            <option value="600">10 minutes</option>
-                        </select>
+                    <div class="col-md-4">
+                        <label class="form-label">Refresh Interval</label>
+                        <input type="text" class="form-control" id="dashboardRefresh" readonly>
                     </div>
-                </form>
+                    <div class="col-md-4">
+                        <label class="form-label">Visualization</label>
+                        <input type="text" class="form-control" id="dashboardVisualization" readonly>
+                    </div>
+                </div>
+                <div id="dashboardOptions"></div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="saveDashboardBtn">Save Dashboard</button>
+                <button type="button" class="btn btn-outline-danger" onclick="deleteDashboard(currentDashboardId)">Delete</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="runQuery(currentDashboardId)">Open Dashboard</button>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Prism.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-sql.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.js"></script>
 
 <script>
-$(document).ready(function() {
-    // Load dashboards
-    loadDashboards();
+let currentDashboardId = null;
+
+function showAlert(type, message, duration = 5000) {
+    const alertContainer = document.getElementById('alertContainer');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-float alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    alertContainer.appendChild(alertDiv);
     
-    // Create Dashboard button
-    $('#createDashboardBtn').on('click', function() {
-        $('#dashboardForm')[0].reset();
-        $('#dashboardModal').modal('show');
-    });
-    
-    // Save Dashboard button
-    $('#saveDashboardBtn').on('click', saveDashboard);
-});
-
-function loadDashboards() {
-    // Fetch saved queries of type 'dashboard'
-    fetch('/get_saved_queries')
-        .then(response => response.json())
-        .then(queries => {
-            const dashboards = queries.filter(q => q.type === 'dashboard');
-            const $grid = $('#dashboardsGrid');
-            $grid.empty();
-
-            dashboards.forEach(dashboard => {
-                const card = `
-                    <div class="col-md-4 mb-4">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <h5 class="card-title">${dashboard.name}</h5>
-                                <p class="card-text">${dashboard.description || 'No description'}</p>
-                                <p class="text-muted">
-                                    <small>
-                                        Layout: ${dashboard.dashboard_layout || 'Full'}<br>
-                                        Refresh: ${dashboard.refresh_interval || 'No'} seconds<br>
-                                        Created: ${new Date(dashboard.created_at).toLocaleDateString()}
-                                    </small>
-                                </p>
-                            </div>
-                            <div class="card-footer bg-transparent">
-                                <div class="btn-group" role="group">
-                                    <button class="btn btn-sm btn-outline-primary" onclick="viewDashboard('${dashboard.id}')">
-                                        <i class="bi bi-eye"></i> View
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-secondary" onclick="editDashboard('${dashboard.id}')">
-                                        <i class="bi bi-pencil"></i> Edit
-                                    </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteDashboard('${dashboard.id}')">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                $grid.append(card);
-            });
-        })
-        .catch(error => {
-            console.error('Error loading dashboards:', error);
-        });
+    setTimeout(() => {
+        alertDiv.classList.remove('show');
+        setTimeout(() => alertDiv.remove(), 300);
+    }, duration);
 }
 
-function saveDashboard() {
-    // TODO: Implement saving dashboard to backend
-    // This is a placeholder that will be implemented later
-}
-
-function viewDashboard(id) {
-    // TODO: Implement dashboard view
-    console.log('View dashboard:', id);
-}
-
-function editDashboard(id) {
-    // TODO: Implement dashboard edit
-    console.log('Edit dashboard:', id);
-}
-
-function deleteDashboard(id) {
-    if (confirm('Are you sure you want to delete this dashboard?')) {
-        fetch(`/delete_query/${id}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                loadDashboards(); // Reload the dashboards list
-            } else {
-                alert('Failed to delete dashboard: ' + (data.error || 'Unknown error'));
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to delete dashboard');
-        });
+function setLoading(element, isLoading) {
+    if (isLoading) {
+        element.classList.add('loading');
+        if (element.tagName === 'BUTTON') {
+            element.disabled = true;
+        }
+    } else {
+        element.classList.remove('loading');
+        if (element.tagName === 'BUTTON') {
+            element.disabled = false;
+        }
     }
 }
+
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    filterDashboards();
+}
+
+function filterDashboards() {
+    const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+    const categoryFilter = document.getElementById('categoryFilter').value.toLowerCase();
+    const layoutFilter = document.getElementById('layoutFilter').value.toLowerCase();
+    const dashboards = document.querySelectorAll('.dashboard-item');
+
+    dashboards.forEach(dashboard => {
+        const name = dashboard.dataset.name;
+        const category = dashboard.dataset.category;
+        const layout = dashboard.dataset.layout;
+
+        const matchesSearch = name.includes(searchTerm);
+        const matchesCategory = !categoryFilter || category === categoryFilter;
+        const matchesLayout = !layoutFilter || layout === layoutFilter;
+
+        dashboard.style.display = matchesSearch && matchesCategory && matchesLayout ? '' : 'none';
+    });
+}
+
+function sortDashboards() {
+    const sortBy = document.getElementById('sortBy').value;
+    const container = document.getElementById('dashboardsGrid');
+    const dashboards = Array.from(document.querySelectorAll('.dashboard-item'));
+
+    dashboards.sort((a, b) => {
+        let aValue, bValue;
+        switch (sortBy) {
+            case 'name':
+                aValue = a.dataset.name;
+                bValue = b.dataset.name;
+                break;
+            case 'created':
+                aValue = a.dataset.created || '';
+                bValue = b.dataset.created || '';
+                break;
+            case 'updated':
+                aValue = a.dataset.updated || a.dataset.created || '';
+                bValue = b.dataset.updated || b.dataset.created || '';
+                break;
+        }
+        return aValue > bValue ? 1 : -1;
+    });
+
+    dashboards.forEach(dashboard => container.appendChild(dashboard));
+}
+
+async function viewDashboard(dashboardId) {
+    const modal = document.getElementById('viewDashboardModal');
+    setLoading(modal, true);
+    currentDashboardId = dashboardId;
+    
+    try {
+        const response = await fetch(`/api/queries/${dashboardId}`);
+        if (!response.ok) throw new Error('Failed to fetch dashboard details');
+        
+        const dashboard = await response.json();
+        document.getElementById('dashboardName').value = dashboard.name;
+        document.getElementById('dashboardDescription').value = dashboard.description;
+        document.getElementById('dashboardQuery').textContent = dashboard.query;
+        document.getElementById('dashboardLayout').value = dashboard.dashboard_layout || 'Full Width';
+        document.getElementById('dashboardRefresh').value = (dashboard.refresh_interval || 'No') + ' seconds';
+        document.getElementById('dashboardVisualization').value = dashboard.default_visualization || 'Table';
+        
+        // Trigger Prism.js syntax highlighting
+        Prism.highlightAll();
+        
+        const modalInstance = new bootstrap.Modal(modal);
+        modalInstance.show();
+    } catch (error) {
+        console.error('Error fetching dashboard:', error);
+        showAlert('danger', 'Failed to load dashboard details');
+    } finally {
+        setLoading(modal, false);
+    }
+}
+
+async function runQuery(dashboardId) {
+    const button = event.target.closest('button');
+    setLoading(button, true);
+    
+    try {
+        const response = await fetch(`/api/queries/${dashboardId}/run`, { method: 'POST' });
+        if (!response.ok) throw new Error('Failed to open dashboard');
+        
+        const result = await response.json();
+        if (result.redirect_url) {
+            window.location.href = result.redirect_url;
+        } else {
+            showAlert('success', 'Dashboard loaded successfully');
+        }
+    } catch (error) {
+        console.error('Error opening dashboard:', error);
+        showAlert('danger', 'Failed to open dashboard');
+    } finally {
+        setLoading(button, false);
+    }
+}
+
+async function deleteDashboard(dashboardId) {
+    if (!confirm('Are you sure you want to delete this dashboard?')) return;
+    
+    const button = event.target.closest('button');
+    setLoading(button, true);
+    
+    try {
+        const response = await fetch(`/delete_query/${dashboardId}`, { method: 'DELETE' });
+        if (!response.ok) throw new Error('Failed to delete dashboard');
+        
+        // Close modal if open
+        const modal = bootstrap.Modal.getInstance(document.getElementById('viewDashboardModal'));
+        if (modal) modal.hide();
+        
+        // Remove dashboard card from the grid
+        const dashboardCard = document.querySelector(`.dashboard-item[data-id="${dashboardId}"]`);
+        if (dashboardCard) {
+            dashboardCard.style.animation = 'fadeOut 0.3s ease-out';
+            setTimeout(() => dashboardCard.remove(), 300);
+        } else {
+            // If we can't find by data-id, reload the page
+            location.reload();
+        }
+        
+        showAlert('success', 'Dashboard deleted successfully');
+    } catch (error) {
+        console.error('Error deleting dashboard:', error);
+        showAlert('danger', 'Failed to delete dashboard');
+    } finally {
+        setLoading(button, false);
+    }
+}
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('searchInput').addEventListener('input', filterDashboards);
+    document.getElementById('categoryFilter').addEventListener('change', filterDashboards);
+    document.getElementById('layoutFilter').addEventListener('change', filterDashboards);
+    document.getElementById('sortBy').addEventListener('change', sortDashboards);
+});
 </script>
 {% endblock %} 

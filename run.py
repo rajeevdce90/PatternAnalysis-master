@@ -1687,12 +1687,36 @@ def detections():
     # Get all saved queries of type 'alert'
     alerts = []
     try:
+        user_id = session.get('user_id')
+        user = User.get_user_by_id(user_id)
+        is_admin = False
+        if user:
+            role = user.get_role()
+            is_admin = role and role.name == 'Administrator'
+            
         for filename in os.listdir(SAVED_QUERIES_DIR):
             if filename.endswith('.json'):
-                with open(os.path.join(SAVED_QUERIES_DIR, filename), 'r') as f:
+                file_path = os.path.join(SAVED_QUERIES_DIR, filename)
+                with open(file_path, 'r') as f:
                     query_data = json.load(f)
                     if query_data.get('type') == 'alert':
-                        alerts.append(query_data)
+                        # Only show alerts if user is admin or alert creator
+                        if is_admin or query_data.get('created_by') == user_id:
+                            query_data['id'] = filename.replace('.json', '')
+                            
+                            # Add severity class for styling
+                            severity = query_data.get('severity', 'high').lower()
+                            query_data['severity_class'] = {
+                                'low': 'success',
+                                'medium': 'warning',
+                                'high': 'warning text-dark',
+                                'critical': 'danger'
+                            }.get(severity, 'danger')
+                            
+                            alerts.append(query_data)
+        
+        # Sort alerts by name
+        alerts.sort(key=lambda x: x.get('name', '').lower())
     except Exception as e:
         logger.error(f"Error loading detections: {str(e)}")
     
@@ -1704,12 +1728,36 @@ def reports():
     # Get all saved queries of type 'report'
     reports = []
     try:
+        user_id = session.get('user_id')
+        user = User.get_user_by_id(user_id)
+        is_admin = False
+        if user:
+            role = user.get_role()
+            is_admin = role and role.name == 'Administrator'
+            
         for filename in os.listdir(SAVED_QUERIES_DIR):
             if filename.endswith('.json'):
-                with open(os.path.join(SAVED_QUERIES_DIR, filename), 'r') as f:
+                file_path = os.path.join(SAVED_QUERIES_DIR, filename)
+                with open(file_path, 'r') as f:
                     query_data = json.load(f)
                     if query_data.get('type') == 'report':
-                        reports.append(query_data)
+                        # Only show reports if user is admin or report creator
+                        if is_admin or query_data.get('created_by') == user_id:
+                            query_data['id'] = filename.replace('.json', '')
+                            
+                            # Add format class for styling
+                            report_format = query_data.get('report_format', 'pdf').lower()
+                            query_data['format_class'] = {
+                                'pdf': 'danger',
+                                'excel': 'success',
+                                'csv': 'primary',
+                                'json': 'warning'
+                            }.get(report_format, 'secondary')
+                            
+                            reports.append(query_data)
+        
+        # Sort reports by name
+        reports.sort(key=lambda x: x.get('name', '').lower())
     except Exception as e:
         logger.error(f"Error loading reports: {str(e)}")
     
@@ -1721,12 +1769,39 @@ def dashboards():
     # Get all saved queries of type 'dashboard'
     dashboards = []
     try:
+        user_id = session.get('user_id')
+        user = User.get_user_by_id(user_id)
+        is_admin = False
+        if user:
+            role = user.get_role()
+            is_admin = role and role.name == 'Administrator'
+            
         for filename in os.listdir(SAVED_QUERIES_DIR):
             if filename.endswith('.json'):
-                with open(os.path.join(SAVED_QUERIES_DIR, filename), 'r') as f:
+                file_path = os.path.join(SAVED_QUERIES_DIR, filename)
+                with open(file_path, 'r') as f:
                     query_data = json.load(f)
                     if query_data.get('type') == 'dashboard':
-                        dashboards.append(query_data)
+                        # Only show dashboards if user is admin or dashboard creator
+                        if is_admin or query_data.get('created_by') == user_id:
+                            query_data['id'] = filename.replace('.json', '')
+                            
+                            # Add category for filtering
+                            category = query_data.get('category', 'custom').lower()
+                            query_data['category'] = category
+                            
+                            # Add category class for styling
+                            query_data['category_class'] = {
+                                'security': 'danger',
+                                'performance': 'success',
+                                'analytics': 'primary',
+                                'custom': 'info'
+                            }.get(category, 'secondary')
+                            
+                            dashboards.append(query_data)
+        
+        # Sort dashboards by name
+        dashboards.sort(key=lambda x: x.get('name', '').lower())
     except Exception as e:
         logger.error(f"Error loading dashboards: {str(e)}")
     
