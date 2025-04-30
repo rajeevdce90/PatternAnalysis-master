@@ -42,7 +42,33 @@
         from { transform: translateX(100%); }
         to { transform: translateX(0); }
     }
+    @keyframes fadeOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+    }
+    .editable-field {
+        background-color: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+        padding: 0.375rem 0.75rem;
+    }
+    
+    .editable-field:focus {
+        border-color: #86b7fe;
+        outline: 0;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    
+    .CodeMirror {
+        height: auto;
+        min-height: 200px;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+    }
 </style>
+<!-- Add CodeMirror for SQL editing -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
 {% endblock %}
 
 {% block content %}
@@ -106,13 +132,13 @@
                             <td>{{ query.updated_at if query.updated_at else query.created_at }}</td>
                             <td>
                                 <div class="btn-group">
-                                    <button class="btn btn-sm btn-outline-primary" onclick="viewQuery('{{ query.id }}')">
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewQuery('{{ query.id }}', event)">
                                         <i class="bi bi-eye"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-success" onclick="runQuery('{{ query.id }}')">
+                                    <button class="btn btn-sm btn-outline-success" onclick="runQuery('{{ query.id }}', event)">
                                         <i class="bi bi-play"></i>
                                     </button>
-                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteQuery('{{ query.id }}')">
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deleteQuery('{{ query.id }}', event)">
                                         <i class="bi bi-trash"></i>
                                     </button>
                                 </div>
@@ -129,7 +155,7 @@
     </div>
 </div>
 
-<!-- View Query Modal -->
+<!-- View/Edit Query Modal -->
 <div class="modal fade" id="viewQueryModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -138,25 +164,28 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Name</label>
-                    <input type="text" class="form-control" id="queryName" readonly>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <textarea class="form-control" id="queryDescription" rows="2" readonly></textarea>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">Query</label>
-                    <pre><code id="queryText" class="language-sql line-numbers"></code></pre>
-                </div>
-                <div id="queryOptions"></div>
+                <form id="queryEditForm">
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" id="queryName">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="queryDescription" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Query</label>
+                        <textarea id="queryText"></textarea>
+                    </div>
+                    <div id="queryOptions"></div>
+                </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-danger" onclick="deleteQuery(currentQueryId)">Delete</button>
-                <button type="button" class="btn btn-outline-primary" onclick="createAlert()">Create Alert</button>
+                <button type="button" class="btn btn-outline-danger" onclick="deleteQuery(currentQueryId, event)">Delete</button>
+                <button type="button" class="btn btn-outline-primary" onclick="createAlert(event)">Create Alert</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="runQuery(currentQueryId)">Run Query</button>
+                <button type="button" class="btn btn-success" onclick="saveQuery(event)">Save Changes</button>
+                <button type="button" class="btn btn-primary" onclick="runQuery(currentQueryId, event)">Run Query</button>
             </div>
         </div>
     </div>
@@ -169,8 +198,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-sql.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.js"></script>
 
+<!-- CodeMirror -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/sql/sql.min.js"></script>
+
 <script>
 let currentQueryId = null;
+let editor = null;
 
 function showAlert(type, message, duration = 5000) {
     const alertContainer = document.getElementById('alertContainer');
@@ -251,19 +285,39 @@ function sortQueries() {
     rows.forEach(row => tbody.appendChild(row));
 }
 
-async function viewQuery(queryId) {
-    const modal = document.getElementById('viewQueryModal');
-    setLoading(modal, true);
+async function viewQuery(queryId, event) {
+    if (event) {
+        const button = event.target.closest('button');
+        setLoading(button, true);
+    }
+    
     currentQueryId = queryId;
+    const modal = document.getElementById('viewQueryModal');
     
     try {
         const response = await fetch(`/api/queries/${queryId}`);
-        if (!response.ok) throw new Error('Failed to fetch query details');
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to fetch query details: ${errorText}`);
+        }
         
         const query = await response.json();
-        document.getElementById('queryName').value = query.name;
-        document.getElementById('queryDescription').value = query.description;
-        document.getElementById('queryText').textContent = query.query;
+        document.getElementById('queryName').value = query.name || '';
+        document.getElementById('queryDescription').value = query.description || '';
+        
+        // Initialize CodeMirror if not already initialized
+        if (!editor) {
+            editor = CodeMirror.fromTextArea(document.getElementById('queryText'), {
+                mode: 'text/x-sql',
+                theme: 'monokai',
+                lineNumbers: true,
+                autoCloseBrackets: true,
+                matchBrackets: true,
+                indentUnit: 4,
+                lineWrapping: true
+            });
+        }
+        editor.setValue(query.query || '');
         
         // Update options based on query type
         const optionsDiv = document.getElementById('queryOptions');
@@ -274,15 +328,19 @@ async function viewQuery(queryId) {
                 <div class="row">
                     <div class="col-md-4">
                         <label class="form-label">Threshold</label>
-                        <input type="text" class="form-control" value="${query.threshold}" readonly>
+                        <input type="number" class="form-control" id="threshold" value="${query.threshold || ''}">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Condition</label>
-                        <input type="text" class="form-control" value="${query.condition}" readonly>
+                        <select class="form-select" id="condition">
+                            <option value="greater_than" ${query.condition === 'greater_than' ? 'selected' : ''}>Greater Than</option>
+                            <option value="less_than" ${query.condition === 'less_than' ? 'selected' : ''}>Less Than</option>
+                            <option value="equals" ${query.condition === 'equals' ? 'selected' : ''}>Equals</option>
+                        </select>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Frequency (min)</label>
-                        <input type="text" class="form-control" value="${query.frequency}" readonly>
+                        <input type="number" class="form-control" id="frequency" value="${query.frequency || ''}">
                     </div>
                 </div>
             `;
@@ -291,11 +349,15 @@ async function viewQuery(queryId) {
                 <div class="row">
                     <div class="col-md-6">
                         <label class="form-label">Schedule</label>
-                        <input type="text" class="form-control" value="${query.schedule}" readonly>
+                        <input type="text" class="form-control" id="reportSchedule" value="${query.report_schedule || ''}">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Format</label>
-                        <input type="text" class="form-control" value="${query.format}" readonly>
+                        <select class="form-select" id="reportFormat">
+                            <option value="pdf" ${query.report_format === 'pdf' ? 'selected' : ''}>PDF</option>
+                            <option value="csv" ${query.report_format === 'csv' ? 'selected' : ''}>CSV</option>
+                            <option value="excel" ${query.report_format === 'excel' ? 'selected' : ''}>Excel</option>
+                        </select>
                     </div>
                 </div>
             `;
@@ -304,40 +366,127 @@ async function viewQuery(queryId) {
                 <div class="row">
                     <div class="col-md-4">
                         <label class="form-label">Layout</label>
-                        <input type="text" class="form-control" value="${query.layout}" readonly>
+                        <select class="form-select" id="dashboardLayout">
+                            <option value="grid" ${query.dashboard_layout === 'grid' ? 'selected' : ''}>Grid</option>
+                            <option value="horizontal" ${query.dashboard_layout === 'horizontal' ? 'selected' : ''}>Horizontal</option>
+                            <option value="vertical" ${query.dashboard_layout === 'vertical' ? 'selected' : ''}>Vertical</option>
+                        </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Refresh Interval</label>
-                        <input type="text" class="form-control" value="${query.refresh_interval}s" readonly>
+                        <label class="form-label">Refresh Interval (sec)</label>
+                        <input type="number" class="form-control" id="refreshInterval" value="${query.refresh_interval || '0'}">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label">Visualization</label>
-                        <input type="text" class="form-control" value="${query.visualization}" readonly>
+                        <select class="form-select" id="defaultVisualization">
+                            <option value="table" ${query.default_visualization === 'table' ? 'selected' : ''}>Table</option>
+                            <option value="line" ${query.default_visualization === 'line' ? 'selected' : ''}>Line Chart</option>
+                            <option value="bar" ${query.default_visualization === 'bar' ? 'selected' : ''}>Bar Chart</option>
+                            <option value="pie" ${query.default_visualization === 'pie' ? 'selected' : ''}>Pie Chart</option>
+                        </select>
                     </div>
                 </div>
             `;
         }
         
-        // Trigger Prism.js syntax highlighting
-        Prism.highlightAll();
-        
+        // Show the modal
         const modalInstance = new bootstrap.Modal(modal);
         modalInstance.show();
     } catch (error) {
         console.error('Error fetching query:', error);
-        showAlert('danger', 'Failed to load query details');
+        showAlert('danger', 'Failed to load query details: ' + error.message);
     } finally {
-        setLoading(modal, false);
+        if (event) {
+            const button = event.target.closest('button');
+            setLoading(button, false);
+        }
     }
 }
 
-async function runQuery(queryId) {
-    const button = event.target.closest('button');
+async function saveQuery(event) {
+    if (!currentQueryId) return;
+    
+    const button = event.target;
     setLoading(button, true);
     
     try {
-        const response = await fetch(`/api/queries/${queryId}/run`, { method: 'POST' });
-        if (!response.ok) throw new Error('Failed to run query');
+        const formData = {
+            name: document.getElementById('queryName').value,
+            description: document.getElementById('queryDescription').value,
+            query: editor.getValue()
+        };
+        
+        // Add type-specific options
+        if (document.getElementById('threshold')) {
+            formData.threshold = document.getElementById('threshold').value;
+            formData.condition = document.getElementById('condition').value;
+            formData.frequency = document.getElementById('frequency').value;
+        } else if (document.getElementById('reportSchedule')) {
+            formData.report_schedule = document.getElementById('reportSchedule').value;
+            formData.report_format = document.getElementById('reportFormat').value;
+        } else if (document.getElementById('dashboardLayout')) {
+            formData.dashboard_layout = document.getElementById('dashboardLayout').value;
+            formData.refresh_interval = document.getElementById('refreshInterval').value;
+            formData.default_visualization = document.getElementById('defaultVisualization').value;
+        }
+        
+        const response = await fetch(`/api/queries/${currentQueryId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to save query: ${errorText}`);
+        }
+        
+        const result = await response.json();
+        
+        // Update the table row
+        const row = document.querySelector(`tr[data-query-id="${currentQueryId}"]`);
+        if (row) {
+            row.cells[0].textContent = formData.name;
+            row.cells[1].textContent = formData.description;
+            row.cells[4].textContent = new Date().toLocaleString();
+        }
+        
+        showAlert('success', 'Query saved successfully');
+        
+        // Close the modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('viewQueryModal'));
+        if (modal) modal.hide();
+    } catch (error) {
+        console.error('Error saving query:', error);
+        showAlert('danger', 'Failed to save query: ' + error.message);
+    } finally {
+        setLoading(button, false);
+    }
+}
+
+async function runQuery(queryId, event) {
+    if (!queryId) return;
+    
+    let button = null;
+    if (event) {
+        button = event.target.closest('button');
+        setLoading(button, true);
+    }
+    
+    try {
+        const response = await fetch(`/api/queries/${queryId}/run`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to run query: ${errorText}`);
+        }
         
         const result = await response.json();
         if (result.redirect_url) {
@@ -347,25 +496,42 @@ async function runQuery(queryId) {
         }
     } catch (error) {
         console.error('Error running query:', error);
-        showAlert('danger', 'Failed to run query');
+        showAlert('danger', 'Failed to run query: ' + error.message);
     } finally {
-        setLoading(button, false);
+        if (button) {
+            setLoading(button, false);
+        }
     }
 }
 
-async function deleteQuery(queryId) {
+async function deleteQuery(queryId, event) {
+    if (!queryId) return;
     if (!confirm('Are you sure you want to delete this query?')) return;
     
-    const button = event.target.closest('button');
-    setLoading(button, true);
+    let button = null;
+    if (event) {
+        button = event.target.closest('button');
+        setLoading(button, true);
+    }
     
     try {
-        const response = await fetch(`/api/queries/${queryId}`, { method: 'DELETE' });
-        if (!response.ok) throw new Error('Failed to delete query');
+        const response = await fetch(`/delete_query/${queryId}`, { method: 'DELETE' });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Failed to delete query: ${errorText}`);
+        }
+        
+        // Try to get the JSON response
+        const result = await response.json().catch(() => ({ success: true }));
         
         // Close modal if open
-        const modal = bootstrap.Modal.getInstance(document.getElementById('viewQueryModal'));
-        if (modal) modal.hide();
+        try {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('viewQueryModal'));
+            if (modal) modal.hide();
+        } catch (modalError) {
+            console.warn('Modal error:', modalError);
+        }
         
         // Remove row from table
         const row = document.querySelector(`tr[data-query-id="${queryId}"]`);
@@ -377,25 +543,52 @@ async function deleteQuery(queryId) {
         showAlert('success', 'Query deleted successfully');
     } catch (error) {
         console.error('Error deleting query:', error);
-        showAlert('danger', 'Failed to delete query');
+        showAlert('danger', 'Failed to delete query: ' + error.message);
     } finally {
-        setLoading(button, false);
+        if (button) {
+            setLoading(button, false);
+        }
     }
 }
 
-function createAlert() {
+function createAlert(event) {
     if (!currentQueryId) return;
+    
+    if (event) {
+        const button = event.target.closest('button');
+        setLoading(button, true);
+    }
+    
     sessionStorage.setItem('createAlertForQuery', currentQueryId);
+    
+    try {
     const modal = bootstrap.Modal.getInstance(document.getElementById('viewQueryModal'));
-    modal.hide();
+        if (modal) modal.hide();
+    } catch (modalError) {
+        console.warn('Modal error:', modalError);
+    }
+    
     window.location.href = "{{ url_for('alerts_page') }}";
-}
+} 
 
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('searchInput').addEventListener('input', filterQueries);
     document.getElementById('typeFilter').addEventListener('change', filterQueries);
     document.getElementById('sortBy').addEventListener('change', sortQueries);
+    
+    // Initialize CodeMirror
+    if (document.getElementById('queryText')) {
+        editor = CodeMirror.fromTextArea(document.getElementById('queryText'), {
+            mode: 'text/x-sql',
+            theme: 'monokai',
+            lineNumbers: true,
+            autoCloseBrackets: true,
+            matchBrackets: true,
+            indentUnit: 4,
+            lineWrapping: true
+        });
+    }
 });
 </script>
 {% endblock %}

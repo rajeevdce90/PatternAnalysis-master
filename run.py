@@ -2188,6 +2188,70 @@ def index_management():
 def indexes():
     return render_template('indexes.html')
 
+@app.route('/api/queries/<query_id>', methods=['PUT'])
+@login_required
+def update_query(query_id):
+    try:
+        # Get the query file path
+        query_file = os.path.join(SAVED_QUERIES_DIR, f"{query_id}.json")
+        if not os.path.exists(query_file):
+            return jsonify({"error": "Query not found"}), 404
+
+        # Load existing query
+        with open(query_file, 'r') as f:
+            existing_query = json.load(f)
+
+        # Get the current user
+        user = User.get_user_by_id(session['user_id'])
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Check if user has permission to edit this query
+        if existing_query.get('user_id') != str(user.id) and not session.get('is_admin'):
+            return jsonify({"error": "Permission denied"}), 403
+
+        # Get the update data
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        # Update the query
+        existing_query.update({
+            'name': data.get('name', existing_query['name']),
+            'description': data.get('description', existing_query['description']),
+            'query': data.get('query', existing_query['query']),
+            'updated_at': datetime.now().isoformat()
+        })
+
+        # Update type-specific fields
+        if existing_query['type'] == 'alert':
+            existing_query.update({
+                'threshold': float(data.get('threshold', existing_query.get('threshold', 0))),
+                'condition': data.get('condition', existing_query.get('condition', 'greater_than')),
+                'frequency': int(data.get('frequency', existing_query.get('frequency', 5)))
+            })
+        elif existing_query['type'] == 'report':
+            existing_query.update({
+                'report_schedule': data.get('report_schedule', existing_query.get('report_schedule', '')),
+                'report_format': data.get('report_format', existing_query.get('report_format', 'pdf'))
+            })
+        elif existing_query['type'] == 'dashboard':
+            existing_query.update({
+                'dashboard_layout': data.get('dashboard_layout', existing_query.get('dashboard_layout', 'grid')),
+                'refresh_interval': int(data.get('refresh_interval', existing_query.get('refresh_interval', 0))),
+                'default_visualization': data.get('default_visualization', existing_query.get('default_visualization', 'table'))
+            })
+
+        # Save the updated query
+        with open(query_file, 'w') as f:
+            json.dump(existing_query, f, indent=2)
+
+        return jsonify({"message": "Query updated successfully", "query": existing_query})
+
+    except Exception as e:
+        logger.error(f"Error updating query: {str(e)}")
+        return jsonify({"error": f"Failed to update query: {str(e)}"}), 500
+
 if __name__ == '__main__':
     # Set up logging
     if not os.path.exists('logs'):
