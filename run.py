@@ -72,7 +72,7 @@ app.register_blueprint(api)
 # if has_app_module:
 #     logger.info("Registering advanced data handling module")
 #     app.register_blueprint(data_bp)
-
+    
 # Initialize regex parser
 regex_parser = RegexParser()
 
@@ -587,19 +587,6 @@ def upload_file():
         if file.filename == '':
             logger.warning("Empty filename provided")
             return jsonify({'error': 'No selected file'}), 400
-        
-        # Security: Sanitize filename to prevent path traversal
-        import os.path
-        safe_filename = os.path.basename(file.filename)
-        if safe_filename != file.filename:
-            logger.warning(f"Potentially malicious filename sanitized: {file.filename} -> {safe_filename}")
-        
-        # Validate file extension
-        allowed_extensions = ['.json', '.csv']
-        file_ext = os.path.splitext(safe_filename)[1].lower()
-        if file_ext not in allowed_extensions:
-            logger.warning(f"Unsupported file extension: {file_ext}")
-            return jsonify({'error': f'Unsupported file extension. Allowed: {", ".join(allowed_extensions)}'}), 400
             
         # Get target index
         target_index = request.form.get('target_index')
@@ -609,130 +596,25 @@ def upload_file():
             logger.warning("No target index provided")
             return jsonify({'error': 'Target index is required'}), 400
         
-        # Get datatype
-        datatype = request.form.get('datatype', 'unknown')
-        logger.info(f"Datatype: {datatype}")
-        
-        # Security: Validate AWS readonly field values if this is an AWS upload
-        if target_index == 'aws':
-            if datatype != 'aws_logs':
-                logger.warning(f"Invalid datatype for AWS upload: {datatype}")
-                return jsonify({'error': 'Invalid datatype for AWS upload - must be "aws_logs"'}), 400
-        
-        # Security: Validate file size on server side (also checked in MAX_CONTENT_LENGTH)
-        max_size = 50 * 1024 * 1024  # 50MB
-        file.seek(0, 2)  # Go to the end of the file
-        file_size = file.tell()  # Get the position (size)
-        file.seek(0)  # Reset to the beginning
-        
-        if file_size > max_size:
-            logger.warning(f"File too large: {file_size} bytes (max: {max_size} bytes)")
-            return jsonify({'error': f'File too large. Maximum size: {max_size / (1024 * 1024):.1f}MB'}), 400
-        
-        # Log the form data and files received
-        logger.info(f"Form data: {dict(request.form)}")
-        logger.info(f"File info: name={safe_filename}, content_type={file.content_type}, size={file_size}")
+        # Log the form data received
+        logger.info(f"Form data: {request.form}")
             
         # Save the file
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_data.json')
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_data.csv')
         logger.info(f"Saving file to {file_path}")
         file.save(file_path)
         
         # Read the file
-        logger.info(f"Processing file format: {safe_filename}")
-        
-        # Special handling for CloudTrail JSON
-        if file_ext == '.json' or file.content_type == 'application/json':
-            logger.info("Reading JSON file")
-            try:
-                # Try to read the file content to verify it's valid JSON
-                with open(file_path, 'r') as f:
-                    file_content = f.read()
-                    logger.info(f"File size: {len(file_content)} bytes")
-                    logger.info(f"First 100 characters: {file_content[:100]}")
-                
-                # Security: Check for malicious content patterns
-                import re
-                suspicious_patterns = [
-                    r'<script', r'javascript:', r'eval\s*\(', r'document\.cookie',
-                    r'fetch\s*\(', r'XMLHttpRequest', r'exec\s*\('
-                ]
-                for pattern in suspicious_patterns:
-                    if re.search(pattern, file_content, re.IGNORECASE):
-                        logger.warning(f"Potentially malicious content detected: {pattern}")
-                        return jsonify({'error': 'Upload contains potentially malicious content'}), 400
-                
-                # First try standard way to read JSON
-                try:
-                    df = pd.read_json(file_path)
-                    logger.info(f"Successfully read JSON file with shape: {df.shape}")
-                except Exception as json_err:
-                    logger.warning(f"Standard JSON reading failed: {str(json_err)}")
-                    
-                    # Try to handle CloudTrail format with Records array
-                    try:
-                        logger.info("Attempting to read as CloudTrail format")
-                        with open(file_path, 'r') as f:
-                            json_data = json.load(f)
-                        
-                        # Check if this is CloudTrail format (has Records array)
-                        if 'Records' in json_data:
-                            # Security: Validate Records structure
-                            if not isinstance(json_data['Records'], list):
-                                logger.warning("Invalid CloudTrail format: Records is not an array")
-                                return jsonify({'error': 'Invalid CloudTrail format: Records must be an array'}), 400
-                            
-                            logger.info(f"Found CloudTrail Records array with {len(json_data['Records'])} items")
-                            
-                            # Security: Validate minimum CloudTrail record structure
-                            for i, record in enumerate(json_data['Records']):
-                                if not isinstance(record, dict):
-                                    logger.warning(f"Invalid record at index {i}: not a dictionary")
-                                    return jsonify({'error': f'Invalid record at index {i}: not a dictionary'}), 400
-                                
-                                # Check for required fields in CloudTrail record
-                                required_fields = ['eventTime', 'eventName', 'eventSource']
-                                missing_fields = [field for field in required_fields if field not in record]
-                                if missing_fields:
-                                    logger.warning(f"Record at index {i} missing required fields: {missing_fields}")
-                                    return jsonify({'error': f'Record at index {i} missing required fields: {missing_fields}'}), 400
-                            
-                            # Convert the Records array to DataFrame
-                            records_list = json_data['Records']
-                            df = pd.json_normalize(records_list)
-                            logger.info(f"Processed CloudTrail Records into DataFrame with shape: {df.shape}")
-                        else:
-                            # Try direct conversion of the JSON structure
-                            logger.info("No Records array found, trying direct conversion")
-                            logger.info(f"Keys in JSON data: {list(json_data.keys())}")
-                            df = pd.json_normalize(json_data)
-                            
-                        logger.info(f"Successfully processed JSON with shape: {df.shape}")
-                    except Exception as ct_err:
-                        logger.error(f"Failed to process CloudTrail format: {str(ct_err)}")
-                        return jsonify({'error': f"Unable to process JSON file: {str(ct_err)}"}), 400
-            except Exception as e:
-                logger.error(f"Error reading JSON file: {str(e)}")
-                return jsonify({'error': f"Error reading JSON file: {str(e)}"}), 400
-        elif file_ext == '.csv':
+        logger.info(f"File format: {file.filename}")
+        if file.filename.endswith('.csv'):
             logger.info("Reading CSV file")
-            try:
-                # Security: Basic CSV injection protection
-                with open(file_path, 'r') as f:
-                    first_line = f.readline().strip()
-                    # Check for suspicious formula patterns
-                    if first_line.startswith('=') or first_line.startswith('+') or first_line.startswith('-') or first_line.startswith('@'):
-                        logger.warning(f"Potentially malicious CSV detected: {first_line[:20]}")
-                        return jsonify({'error': 'Upload contains potentially malicious content'}), 400
-                
-                df = pd.read_csv(file_path)
-                logger.info(f"Successfully read CSV file with shape: {df.shape}")
-            except Exception as e:
-                logger.error(f"Error reading CSV file: {str(e)}")
-                return jsonify({'error': f"Error reading CSV file: {str(e)}"}), 400
+            df = pd.read_csv(file_path)
+        elif file.filename.endswith('.json'):
+            logger.info("Reading JSON file")
+            df = pd.read_json(file_path)
         else:
-            logger.warning(f"Unsupported file format: {safe_filename}")
-            return jsonify({'error': 'Unsupported file format. Please upload a CSV or JSON file.'}), 400
+            logger.warning(f"Unsupported file format: {file.filename}")
+            return jsonify({'error': 'Unsupported file format'}), 400
             
         # Get column information
         logger.info(f"DataFrame shape: {df.shape}")
@@ -743,6 +625,8 @@ def upload_file():
         logger.info(f"Number of records: {len(records)}")
         
         # Add metadata to each record
+        datatype = request.form.get('datatype', 'unknown')
+        logger.info(f"Datatype: {datatype}")
         for record in records:
             record['datatype'] = datatype
             record['@timestamp'] = datetime.now().isoformat()
@@ -781,7 +665,7 @@ def upload_file():
                 
         except Exception as e:
             logger.error(f"Error bulk indexing data: {str(e)}", exc_info=True)
-            return jsonify({'error': f"Error indexing data: {str(e)}"}), 500
+            # Continue to return the upload success response even if indexing failed
         
         # Store target index in session for later use
         session['target_index'] = target_index
@@ -790,7 +674,7 @@ def upload_file():
         return jsonify({
             'success': True,
             'columns': columns,
-            'events': records[:10],  # Limit to first 10 for display
+            'events': records[:1000],  # Limit to first 1000 for display
             'total_events': len(df),
             'valid_events': df.notna().all(axis=1).sum(),
             'target_index': target_index,
@@ -798,7 +682,7 @@ def upload_file():
         })
         
     except Exception as e:
-        logger.error(f"Error in upload_file: {str(e)}", exc_info=True)
+        logger.error(f"Error in upload_file: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/generate_patterns', methods=['POST'])
@@ -1131,13 +1015,13 @@ def saved_queries():
         is_admin = False
         if user:
             role = user.get_role()
-        is_admin = role and role.name == 'Administrator'
+            is_admin = role and role.name == 'Administrator'
         
         # Get all saved queries
         queries = []
         if os.path.exists(SAVED_QUERIES_DIR):
-        for filename in os.listdir(SAVED_QUERIES_DIR):
-            if filename.endswith('.json'):
+            for filename in os.listdir(SAVED_QUERIES_DIR):
+                if filename.endswith('.json'):
                     file_path = os.path.join(SAVED_QUERIES_DIR, filename)
                     with open(file_path, 'r') as f:
                         query = json.load(f)
@@ -1907,7 +1791,7 @@ def detections():
                                 'critical': 'danger'
                             }.get(severity, 'danger')
                             
-                        alerts.append(query_data)
+                            alerts.append(query_data)
         
         # Sort alerts by name
         alerts.sort(key=lambda x: x.get('name', '').lower())
@@ -1948,7 +1832,7 @@ def reports():
                                 'json': 'warning'
                             }.get(report_format, 'secondary')
                             
-                        reports.append(query_data)
+                            reports.append(query_data)
         
         # Sort reports by name
         reports.sort(key=lambda x: x.get('name', '').lower())
@@ -1992,7 +1876,7 @@ def dashboards():
                                 'custom': 'info'
                             }.get(category, 'secondary')
                             
-                        dashboards.append(query_data)
+                            dashboards.append(query_data)
         
         # Sort dashboards by name
         dashboards.sort(key=lambda x: x.get('name', '').lower())
@@ -2446,174 +2330,28 @@ def update_query(query_id):
         logger.error(f"Error updating query: {str(e)}")
         return jsonify({"error": f"Failed to update query: {str(e)}"}), 500
 
-@app.route('/api/test_aws_upload', methods=['POST'])
-def test_aws_upload():
-    """Test endpoint for AWS CloudTrail upload functionality."""
-    try:
-        logger.info("Test AWS upload endpoint called")
-        
-        # Check if there's a file in the request
-        if 'file' in request.files:
-            file = request.files['file']
-            logger.info(f"File received: {file.filename}")
-            
-            # Security: Sanitize filename to prevent path traversal
-            import os.path
-            safe_filename = os.path.basename(file.filename)
-            if safe_filename != file.filename:
-                logger.warning(f"Potentially malicious filename sanitized: {file.filename} -> {safe_filename}")
-            
-            # Validate file extension
-            allowed_extensions = ['.json']
-            file_ext = os.path.splitext(safe_filename)[1].lower()
-            if file_ext not in allowed_extensions:
-                logger.warning(f"Unsupported file extension: {file_ext}")
-                return jsonify({
-                    'success': False,
-                    'error': f'Unsupported file extension. Allowed: {", ".join(allowed_extensions)}',
-                    'file_received': True,
-                    'filename': safe_filename
-                }), 400
-            
-            # Security: Validate file size on server side
-            max_size = 50 * 1024 * 1024  # 50MB
-            file.seek(0, 2)  # Go to the end of the file
-            file_size = file.tell()  # Get the position (size)
-            file.seek(0)  # Reset to the beginning
-            
-            if file_size > max_size:
-                logger.warning(f"File too large: {file_size} bytes (max: {max_size} bytes)")
-                return jsonify({
-                    'success': False,
-                    'error': f'File too large. Maximum size: {max_size / (1024 * 1024):.1f}MB',
-                    'file_received': True,
-                    'filename': safe_filename
-                }), 400
-            
-            # Save the file
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_aws.json')
-            file.save(file_path)
-            
-            # Try to read as CloudTrail format
-            try:
-                with open(file_path, 'r') as f:
-                    file_content = f.read()
-                    
-                # Security: Check for malicious content patterns
-                import re
-                suspicious_patterns = [
-                    r'<script', r'javascript:', r'eval\s*\(', r'document\.cookie',
-                    r'fetch\s*\(', r'XMLHttpRequest', r'exec\s*\('
-                ]
-                for pattern in suspicious_patterns:
-                    if re.search(pattern, file_content, re.IGNORECASE):
-                        logger.warning(f"Potentially malicious content detected: {pattern}")
-                        return jsonify({
-                            'success': False,
-                            'error': 'Upload contains potentially malicious content',
-                            'file_received': True,
-                            'filename': safe_filename
-                        }), 400
-                
-                with open(file_path, 'r') as f:
-                    json_data = json.load(f)
-                
-                # Check if it has Records array
-                has_records = 'Records' in json_data
-                if has_records:
-                    # Validate Records structure
-                    if not isinstance(json_data['Records'], list):
-                        logger.warning("Invalid CloudTrail format: Records is not an array")
-                        return jsonify({
-                            'success': False,
-                            'error': 'Invalid CloudTrail format: Records must be an array',
-                            'file_received': True,
-                            'filename': safe_filename
-                        }), 400
-                    
-                    record_count = len(json_data['Records'])
-                    
-                    # Validate minimum CloudTrail record structure
-                    for i, record in enumerate(json_data['Records']):
-                        if not isinstance(record, dict):
-                            logger.warning(f"Invalid record at index {i}: not a dictionary")
-                            return jsonify({
-                                'success': False,
-                                'error': f'Invalid record at index {i}: not a dictionary',
-                                'file_received': True,
-                                'filename': safe_filename
-                            }), 400
-                        
-                        # Check for required fields in CloudTrail record
-                        required_fields = ['eventTime', 'eventName', 'eventSource']
-                        missing_fields = [field for field in required_fields if field not in record]
-                        if missing_fields:
-                            logger.warning(f"Record at index {i} missing required fields: {missing_fields}")
-                            return jsonify({
-                                'success': False,
-                                'error': f'Record at index {i} missing required fields: {missing_fields}',
-                                'file_received': True,
-                                'filename': safe_filename
-                            }), 400
-                else:
-                    record_count = 0
-                
-                return jsonify({
-                    'success': True,
-                    'file_received': True,
-                    'filename': safe_filename,
-                    'filesize': os.path.getsize(file_path),
-                    'is_cloudtrail_format': has_records,
-                    'record_count': record_count
-                })
-            except Exception as e:
-                logger.error(f"Error processing file: {str(e)}")
-                return jsonify({
-                    'success': False,
-                    'error': f"Error processing file: {str(e)}",
-                    'file_received': True,
-                    'filename': safe_filename
-                })
-        elif 'test' in request.form:
-            # Simple echo test
-            return jsonify({
-                'success': True,
-                'message': 'Test endpoint working',
-                'received': request.form.get('test')
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'No file or test parameter provided',
-                'form_data': dict(request.form),
-                'has_files': 'file' in request.files
-            })
-    except Exception as e:
-        logger.error(f"Error in test_aws_upload: {str(e)}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-if __name__ == "__main__":
-    # Configure file logging
+if __name__ == '__main__':
+    # Set up logging
     if not os.path.exists('logs'):
-        os.makedirs('logs')
+        os.mkdir('logs')
     
-    # Set up rotating file handler
-    file_handler = RotatingFileHandler('logs/app.log', maxBytes=10485760, backupCount=10)
+    file_handler = RotatingFileHandler(
+        'logs/pattern_analysis.log',
+        maxBytes=10240,
+        backupCount=10
+    )
     file_handler.setFormatter(logging.Formatter(
         '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
     ))
     file_handler.setLevel(logging.INFO)
+    
     app.logger.addHandler(file_handler)
-    
-    # Set overall logging level
     app.logger.setLevel(logging.INFO)
-    app.logger.info('Pattern Analysis starting')
+    app.logger.info('Pattern Analysis startup')
     
-    # Get port from environment variable or use default
-    port = int(os.environ.get('PORT', 5000))
-    
-    # Run the application
-    app.run(host='0.0.0.0', port=port, debug=True)
+    # Run the app
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=True
+    ) 

@@ -41,11 +41,6 @@
                 </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="aws-tab" data-bs-toggle="tab" data-bs-target="#aws-pane" type="button" role="tab" aria-controls="aws-pane" aria-selected="false">
-                    <i class="bi bi-cloud"></i> AWS CloudTrail
-                </button>
-            </li>
-            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="rest-tab" data-bs-toggle="tab" data-bs-target="#rest-pane" type="button" role="tab" aria-controls="rest-pane" aria-selected="false">
                     <i class="bi bi-cloud-arrow-down"></i> REST API Collector
                 </button>
@@ -79,7 +74,7 @@
                             <form id="uploadForm" enctype="multipart/form-data">
                                 <div class="mb-3">
                                     <label for="targetIndex" class="form-label">Target Index</label>
-                                    <input type="text" class="form-control" id="targetIndex" name="target_index" list="indexOptions" required>
+                                    <input type="text" class="form-control" id="targetIndex" name="targetIndex" list="indexOptions" required>
                                     <datalist id="indexOptions">
                                         <option value="aws">AWS Logs</option>
                                         <option value="cloudtrail">CloudTrail</option>
@@ -102,7 +97,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label for="logFile" class="form-label">Log File</label>
-                                    <input type="file" id="logFile" name="file" class="form-control" accept=".csv, .json" required>
+                                    <input type="file" id="logFile" class="form-control" accept=".csv, .json" required>
                                 </div>
                                 <button type="submit" class="btn btn-primary" id="uploadBtn">Upload and Analyze</button>
                                 <div class="spinner-border text-primary d-none" id="uploadSpinner" role="status">
@@ -152,37 +147,6 @@
             </div>
                     </div>
                 </div>
-
-            <!-- AWS CloudTrail Pane -->
-            <div class="tab-pane fade" id="aws-pane" role="tabpanel" aria-labelledby="aws-tab">
-                <h4>Upload AWS CloudTrail Data</h4>
-                <p>Directly upload AWS CloudTrail data to the OpenSearch index.</p>
-                <form id="awsUploadForm" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="awsTargetIndex" class="form-label">Target Index</label>
-                        <input type="text" class="form-control" id="awsTargetIndex" name="target_index" value="aws" readonly>
-                        <div class="form-text">Index name for AWS CloudTrail data</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="awsDatatype" class="form-label">Data Type</label>
-                        <input type="text" class="form-control" id="awsDatatype" name="datatype" value="aws_logs" readonly>
-                        <div class="form-text">Type of AWS data being uploaded</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="awsLogFile" class="form-label">CloudTrail JSON File</label>
-                        <input type="file" id="awsLogFile" name="file" class="form-control" accept=".json" required>
-                        <div class="form-text">Select a CloudTrail JSON file</div>
-                    </div>
-                    <button type="button" class="btn btn-primary" id="awsUploadBtn">
-                        Upload CloudTrail Data
-                    </button>
-                    <div class="spinner-border text-primary d-none" id="awsUploadSpinner" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </form>
-                <div id="awsUploadStatus" class="alert mt-3" style="display: none;"></div>
-                <div id="awsQueryOptions" class="mt-3"></div>
-            </div>
 
             <!-- REST API Collector Pane -->
             <div class="tab-pane fade" id="rest-pane" role="tabpanel" aria-labelledby="rest-tab">
@@ -459,38 +423,18 @@ let itemsPerPage = 10;
 let patterns = [];
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing event handlers');
+    console.log('DOM loaded, setting up event handlers');
     
-    // Regular file upload form handling
     const uploadForm = document.getElementById('uploadForm');
     if (uploadForm) {
+        console.log('Upload form found, adding submit handler');
         uploadForm.addEventListener('submit', function(e) {
+            console.log('Form submit event triggered');
             e.preventDefault();
             uploadFile();
         });
-    }
-    
-    // AWS CloudTrail upload button click handler
-    const awsUploadBtn = document.getElementById('awsUploadBtn');
-    if (awsUploadBtn) {
-        console.log('AWS upload button found, adding click handler');
-        awsUploadBtn.addEventListener('click', function() {
-            console.log('AWS upload button clicked');
-            uploadAwsCloudTrail();
-        });
     } else {
-        console.error('AWS upload button not found in DOM');
-    }
-    
-    // Method selector for REST API
-    const apiMethod = document.getElementById('apiMethod');
-    if (apiMethod) {
-        apiMethod.addEventListener('change', function() {
-            const bodyContainer = document.getElementById('apiBodyContainer');
-            if (bodyContainer) {
-                bodyContainer.style.display = this.value === 'POST' ? 'block' : 'none';
-            }
-        });
+        console.error('Upload form not found in DOM');
     }
     
     // Load indices for all dropdowns on page load - REMOVED
@@ -724,23 +668,6 @@ function uploadFile() {
         return;
     }
     
-    // Security: Client-side file size validation
-    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
-    if (fileInput.files[0].size > maxSize) {
-        showAlert('warning', `File exceeds maximum size of ${(maxSize / (1024 * 1024)).toFixed(1)}MB`);
-        return;
-    }
-    
-    // Security: Client-side file type validation
-    const allowedExtensions = ['.json', '.csv'];
-    const fileName = fileInput.files[0].name;
-    const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-    
-    if (!allowedExtensions.includes(fileExt)) {
-        showAlert('warning', `Unsupported file type. Allowed extensions: ${allowedExtensions.join(', ')}`);
-        return;
-    }
-    
     // Show upload status as loading
     const uploadStatus = document.getElementById('uploadStatus');
     uploadStatus.innerHTML = '<div class="spinner-border text-primary" role="status"></div> Uploading file...';
@@ -764,11 +691,6 @@ function uploadFile() {
     })
     .then(response => {
         console.log("Response received:", response.status); // Debug logging
-        if (!response.ok) {
-            return response.json().then(data => {
-                throw new Error(data.error || `HTTP error ${response.status}`);
-            });
-        }
         return response.json();
     })
     .then(data => {
@@ -784,9 +706,6 @@ function uploadFile() {
             }
             uploadStatus.className = 'alert alert-success mt-3';
             uploadStatus.textContent = message;
-            
-            // Reset file input after successful upload
-            fileInput.value = '';
             
             // Update the UI with the loaded data
             displayUploadResults(data);
@@ -1344,325 +1263,5 @@ function displayUploadResults(data) {
     }
 }
 
-// Function to handle AWS CloudTrail direct upload
-function uploadAwsCloudTrail() {
-    console.log("AWS CloudTrail upload function called");
-    const fileInput = document.getElementById('awsLogFile');
-    const targetIndex = document.getElementById('awsTargetIndex').value;
-    const datatype = document.getElementById('awsDatatype').value;
-    const statusDiv = document.getElementById('awsUploadStatus');
-    const spinner = document.getElementById('awsUploadSpinner');
-    const uploadBtn = document.getElementById('awsUploadBtn');
-    
-    // Enhanced debugging - log all elements
-    console.log("Elements found:", {
-        fileInput: !!fileInput,
-        targetIndex: targetIndex, 
-        datatype: datatype,
-        statusDiv: !!statusDiv,
-        spinner: !!spinner,
-        uploadBtn: !!uploadBtn
-    });
-    
-    // Validation
-    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-        console.error("No file selected or file input not found");
-        statusDiv.textContent = 'Please select a CloudTrail JSON file';
-        statusDiv.className = 'alert alert-warning mt-3';
-        statusDiv.style.display = 'block';
-        return;
-    }
-    
-    // Security: Confirm AWS index value
-    if (targetIndex !== 'aws') {
-        console.error("Invalid target index for AWS upload");
-        statusDiv.textContent = 'Invalid target index for AWS upload. Must use "aws".';
-        statusDiv.className = 'alert alert-warning mt-3';
-        statusDiv.style.display = 'block';
-        return;
-    }
-    
-    // Security: Confirm AWS datatype
-    if (datatype !== 'aws_logs') {
-        console.error("Invalid datatype for AWS upload");
-        statusDiv.textContent = 'Invalid datatype for AWS upload. Must use "aws_logs".';
-        statusDiv.className = 'alert alert-warning mt-3';
-        statusDiv.style.display = 'block';
-        return;
-    }
-    
-    // Security: Client-side file size validation
-    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
-    if (fileInput.files[0].size > maxSize) {
-        console.error("File too large:", fileInput.files[0].size);
-        statusDiv.textContent = `File exceeds maximum size of ${(maxSize / (1024 * 1024)).toFixed(1)}MB`;
-        statusDiv.className = 'alert alert-warning mt-3';
-        statusDiv.style.display = 'block';
-        return;
-    }
-    
-    // Security: Client-side file type validation
-    const fileName = fileInput.files[0].name;
-    const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-    if (fileExt !== '.json') {
-        console.error("Invalid file type:", fileExt);
-        statusDiv.textContent = 'Invalid file type. AWS CloudTrail uploads must be JSON files.';
-        statusDiv.className = 'alert alert-warning mt-3';
-        statusDiv.style.display = 'block';
-        return;
-    }
-    
-    // Show loading indicators
-    statusDiv.innerHTML = 'Processing CloudTrail data...';
-    statusDiv.className = 'alert alert-info mt-3';
-    statusDiv.style.display = 'block';
-    uploadBtn.disabled = true;
-    spinner.classList.remove('d-none');
-    
-    // Create FormData object
-    const formData = new FormData();
-    formData.append('file', fileInput.files[0]);
-    formData.append('target_index', targetIndex);
-    formData.append('datatype', datatype);
-    
-    console.log("FormData created with:", {
-        fileName: fileInput.files[0].name,
-        fileSize: fileInput.files[0].size,
-        fileType: fileInput.files[0].type,
-        targetIndex: targetIndex,
-        datatype: datatype
-    });
-    
-    // Send the request with detailed debugging
-    console.log("Sending fetch request to /upload endpoint");
-    fetch('/upload', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        console.log("Response received:", {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries([...response.headers])
-        });
-        
-        // Check if response is ok before parsing JSON
-        if (!response.ok) {
-            console.error("Response not OK:", response.status, response.statusText);
-            throw new Error(`Server error: ${response.status} ${response.statusText}`);
-        }
-        
-        return response.json().catch(error => {
-            console.error("Error parsing JSON response:", error);
-            throw new Error("Invalid response from server: " + error.message);
-        });
-    })
-    .then(data => {
-        console.log("Response data:", data);
-        uploadBtn.disabled = false;
-        spinner.classList.add('d-none');
-        
-        if (data.success) {
-            // Success handling
-            statusDiv.className = 'alert alert-success mt-3';
-            statusDiv.textContent = `Success! ${data.total_events} CloudTrail events have been indexed to the "${targetIndex}" index.`;
-            
-            // Reset file input after successful upload
-            fileInput.value = '';
-            
-            // Add query options
-            const queryDiv = document.getElementById('awsQueryOptions');
-            queryDiv.innerHTML = '';
-            
-            // Create a "View Data" button
-            const viewDataBtn = document.createElement('a');
-            viewDataBtn.href = '/indexes';
-            viewDataBtn.className = 'btn btn-primary mt-2 me-2';
-            viewDataBtn.innerHTML = '<i class="bi bi-table"></i> View Indexed Data';
-            viewDataBtn.setAttribute('target', '_blank');
-            queryDiv.appendChild(viewDataBtn);
-            
-            // Create a "Run Query" button
-            const queryBtn = document.createElement('a');
-            queryBtn.href = '/sql_query';
-            queryBtn.className = 'btn btn-secondary mt-2';
-            queryBtn.innerHTML = '<i class="bi bi-search"></i> Query CloudTrail Data';
-            queryBtn.setAttribute('target', '_blank');
-            queryDiv.appendChild(queryBtn);
-            
-            // Show a hint about the direct upload method
-            const hintDiv = document.createElement('div');
-            hintDiv.className = 'alert alert-info mt-3';
-            hintDiv.innerHTML = '<strong>Note:</strong> This method uploads directly to OpenSearch. CloudTrail data is now stored with the original structure in the "aws" index.';
-            queryDiv.appendChild(hintDiv);
-            
-        } else {
-            // Error handling
-            statusDiv.className = 'alert alert-danger mt-3';
-            statusDiv.textContent = 'Error: ' + (data.error || data.message || 'Unknown error occurred');
-            console.error("Upload failed:", data.error || data.message || 'Unknown error');
-        }
-    })
-    .catch(error => {
-        console.error("Fetch error:", error);
-        uploadBtn.disabled = false;
-        spinner.classList.add('d-none');
-        
-        statusDiv.className = 'alert alert-danger mt-3';
-        statusDiv.textContent = 'Error: ' + error.message;
-    });
-}
-
-    </script>
-    
-    <!-- AWS CloudTrail Upload Test Script -->
-    <script>
-        // Add this script to the page just before the end of the file
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('AWS CloudTrail test script loaded');
-            
-            // Function to create a test CloudTrail record
-            function createTestCloudTrailRecord() {
-                return {
-                    "Records": [
-                        {
-                            "eventVersion": "1.05",
-                            "eventTime": "2023-01-01T12:00:00Z",
-                            "eventSource": "test.amazonaws.com",
-                            "eventName": "TestEvent",
-                            "userIdentity": {
-                                "type": "IAMUser",
-                                "principalId": "TEST123456789",
-                                "arn": "arn:aws:iam::123456789012:user/testuser",
-                                "accountId": "123456789012",
-                                "accessKeyId": "AKIATESTKEY12345",
-                                "userName": "testuser"
-                            },
-                            "awsRegion": "us-east-1",
-                            "sourceIPAddress": "192.168.1.1",
-                            "requestParameters": {
-                                "param1": "value1",
-                                "param2": "value2"
-                            },
-                            "responseElements": {
-                                "result": "success"
-                            }
-                        }
-                    ]
-                };
-            }
-            
-            // Function to create a test CloudTrail Blob 
-            function createTestCloudTrailBlob() {
-                const testRecord = createTestCloudTrailRecord();
-                const jsonString = JSON.stringify(testRecord);
-                return new Blob([jsonString], {type: 'application/json'});
-            }
-            
-            // Add a button for testing directly with a generated sample
-            const awsUploadForm = document.getElementById('awsUploadForm');
-            if (awsUploadForm) {
-                // Add click event for the upload button
-                const awsUploadBtn = document.getElementById('awsUploadBtn');
-                if (awsUploadBtn) {
-                    console.log('Setting up AWS upload button click handler');
-                    awsUploadBtn.addEventListener('click', function() {
-                        console.log('AWS upload button clicked');
-                        uploadAwsCloudTrail();
-                    });
-                } else {
-                    console.error('AWS upload button not found');
-                }
-                
-                // Create a test button element
-                const testUploadBtn = document.createElement('button');
-                testUploadBtn.type = 'button';
-                testUploadBtn.className = 'btn btn-info mt-3';
-                testUploadBtn.innerText = 'Test with Sample Data';
-                testUploadBtn.addEventListener('click', function() {
-                    console.log('Test upload button clicked');
-                    
-                    const targetIndex = document.getElementById('awsTargetIndex').value;
-                    const datatype = document.getElementById('awsDatatype').value;
-                    const statusDiv = document.getElementById('awsUploadStatus');
-                    
-                    // Security: Validate the target index and datatype
-                    if (targetIndex !== 'aws') {
-                        console.error("Invalid target index for AWS upload");
-                        statusDiv.textContent = 'Invalid target index for AWS upload. Must use "aws".';
-                        statusDiv.className = 'alert alert-warning mt-3';
-                        statusDiv.style.display = 'block';
-                        return;
-                    }
-                    
-                    if (datatype !== 'aws_logs') {
-                        console.error("Invalid datatype for AWS upload");
-                        statusDiv.textContent = 'Invalid datatype for AWS upload. Must use "aws_logs".';
-                        statusDiv.className = 'alert alert-warning mt-3';
-                        statusDiv.style.display = 'block';
-                        return;
-                    }
-                    
-                    // Create a test file
-                    const testBlob = createTestCloudTrailBlob();
-                    const testFile = new File([testBlob], 'test-cloudtrail.json', {type: 'application/json'});
-                    
-                    // Create FormData object
-                    const formData = new FormData();
-                    formData.append('file', testFile);
-                    formData.append('target_index', targetIndex);
-                    formData.append('datatype', datatype);
-                    
-                    // Show status
-                    statusDiv.innerHTML = 'Uploading test CloudTrail data...';
-                    statusDiv.className = 'alert alert-info mt-3';
-                    statusDiv.style.display = 'block';
-                    
-                    // Send request to upload endpoint
-                    fetch('/upload', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            return response.json().then(data => {
-                                throw new Error(data.error || `HTTP error ${response.status}`);
-                            });
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Test upload response:', data);
-                        if (data.success) {
-                            statusDiv.className = 'alert alert-success mt-3';
-                            statusDiv.textContent = `Test successful! Sample CloudTrail data uploaded.`;
-                            
-                            // Add query options
-                            const queryDiv = document.getElementById('awsQueryOptions');
-                            queryDiv.innerHTML = '';
-                            
-                            // Create a "View Data" button
-                            const viewDataBtn = document.createElement('a');
-                            viewDataBtn.href = '/indexes';
-                            viewDataBtn.className = 'btn btn-primary mt-2 me-2';
-                            viewDataBtn.innerHTML = '<i class="bi bi-table"></i> View Test Data';
-                            viewDataBtn.setAttribute('target', '_blank');
-                            queryDiv.appendChild(viewDataBtn);
-                        } else {
-                            statusDiv.className = 'alert alert-danger mt-3';
-                            statusDiv.textContent = 'Error: ' + (data.error || data.message || 'Unknown error occurred');
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Test upload error:", error);
-                        statusDiv.className = 'alert alert-danger mt-3';
-                        statusDiv.textContent = 'Error: ' + error.message;
-                    });
-                });
-                
-                // Add the button to the form
-                awsUploadForm.appendChild(testUploadBtn);
-            }
-        });
     </script>
 {% endblock %} 
