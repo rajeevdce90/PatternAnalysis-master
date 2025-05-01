@@ -1,244 +1,858 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Search - Zamuun</title>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
+{% extends "base.html" %}
+
+{% block head %}
+<!-- CodeMirror -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css">
     <style>
-        :root {
-            --primary-color: #0085C7;
-            --secondary-color: #F4F4F4;
-            --text-color: #333333;
-            --error-color: #DC3545;
-            --success-color: #28A745;
-            --warning-color: #FFC107;
-        }
+    .CodeMirror {
+        height: auto;
+        min-height: 200px;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+    }
 
-        body {
-            font-family: 'Montserrat', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--secondary-color);
-            color: var(--text-color);
-        }
+    .loading {
+        position: relative;
+        pointer-events: none;
+        opacity: 0.6;
+    }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
+    .loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 1.5rem;
+        height: 1.5rem;
+        margin: -0.75rem 0 0 -0.75rem;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid #0d6efd;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
 
-        .header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
 
-        .logo {
-            font-size: 2rem;
-            font-weight: 600;
-            color: var(--primary-color);
-            margin-right: 1rem;
-        }
+    #alertContainer {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 1050;
+    }
 
-        .search-box {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 2rem;
-        }
+    .alert-float {
+        min-width: 300px;
+        margin-bottom: 10px;
+        animation: slideIn 0.3s ease-out;
+    }
 
-        .query-input {
-            width: 100%;
-            padding: 1rem;
-            border: 2px solid var(--secondary-color);
-            border-radius: 4px;
-            font-size: 1rem;
-            margin-bottom: 1rem;
-            font-family: monospace;
-            min-height: 100px;
-        }
+    @keyframes slideIn {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+    }
 
-        .search-button {
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-            padding: 1rem 2rem;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 500;
-        }
+    .chart-container {
+        position: relative;
+        height: 60vh;
+        width: 100%;
+    }
 
-        .search-button:hover {
-            opacity: 0.9;
-        }
+    #map {
+        height: 60vh;
+        width: 100%;
+        border-radius: 5px;
+    }
 
-        .results {
-            margin-top: 2rem;
-        }
+    .table-responsive {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
 
-        .result-item {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+    .column-stats {
+        cursor: pointer;
+    }
 
-        .result-title {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: var(--primary-color);
-        }
-
-        .result-content {
-            color: #666;
-            white-space: pre-wrap;
-            font-family: monospace;
-        }
-
-        .warning-banner {
-            background-color: var(--warning-color);
-            color: var(--text-color);
-            padding: 1rem;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-        }
-
-        .warning-icon {
-            margin-right: 0.5rem;
-        }
-
-        .query-help {
-            background: white;
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            font-size: 0.9rem;
-        }
-
-        .query-help h3 {
-            margin-top: 0;
-            color: var(--primary-color);
-        }
-
-        .query-example {
-            background: var(--secondary-color);
-            padding: 0.5rem;
-            border-radius: 4px;
-            margin: 0.5rem 0;
-            font-family: monospace;
+    .column-stats:hover {
+        background-color: #f8f9fa;
         }
     </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">Zamuun</div>
+{% endblock %}
+
+{% block content %}
+<div id="alertContainer"></div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>Search Interface</h2>
+                <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#saveQueryModal">
+                    <i class="bi bi-save"></i> Save Query
+                </button>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <form id="searchForm" onsubmit="executeQuery(); return false;">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label for="queryLanguage" class="form-label">Query Language:</label>
+                                <select class="form-select" id="queryLanguage" onchange="updateQueryInterface()">
+                                    <option value="sql" selected>SQL</option>
+                                    <option value="ppl">PPL (Piped Processing Language)</option>
+                                    <option value="dsl">DSL (Elasticsearch Query DSL)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3" id="indexContainer" style="display: none;">
+                                <label for="indexName" class="form-label">Index Name:</label>
+                                <input type="text" class="form-control" id="indexName" placeholder="Enter index name">
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <button type="button" class="btn btn-outline-secondary mt-4" onclick="loadSampleQuery()">
+                                    Load Sample Query
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="queryEditor" class="form-label">Enter Query:</label>
+                            <textarea id="queryEditor" class="form-control"></textarea>
+                            <div id="dslHelpText" class="alert alert-info mt-2" style="display: none;">
+                                <strong>DSL Query Format:</strong> Enter a valid JSON object. The index name specified above will be used.
+                                <pre class="mb-0 mt-2">
+{
+  "query": { "match_all": {} },
+  "size": 100
+}</pre>
+                            </div>
         </div>
 
-        {% if not opensearch_available %}
-        <div class="warning-banner">
-            <span class="warning-icon">⚠️</span>
-            <span>OpenSearch is not available. Using fallback storage. Some features may be limited.</span>
-        </div>
-        {% endif %}
-
-        <div class="query-help">
-            <h3>Search Help</h3>
-            <p>You can use the following query formats:</p>
-            <div class="query-example">
-                Simple text search: "error" or "warning"
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Execute Query</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="clearQuery()">Clear</button>
+                            <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#saveQueryModal">
+                                <i class="bi bi-save"></i> Save Query
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-            <div class="query-example">
-                Field-specific search: "pattern:error" or "example:warning"
-            </div>
-            <div class="query-example">
-                Boolean operators: "error AND warning" or "error OR warning"
-            </div>
-            <div class="query-example">
-                Wildcards: "err*" or "warn*"
-            </div>
-        </div>
-
-        <div class="search-box">
-            <textarea class="query-input" placeholder="Enter your search query..." id="queryInput"></textarea>
-            <button class="search-button" onclick="searchData()">Search</button>
-        </div>
-
-        <div class="results" id="results">
-            <!-- Results will be populated here -->
         </div>
     </div>
 
-    <script>
-        function searchData() {
-            const query = document.getElementById('queryInput').value;
-            const resultsDiv = document.getElementById('results');
-            
-            fetch('/search_data', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ query: query })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    resultsDiv.innerHTML = `<div class="result-item">
-                        <div class="result-title">Error</div>
-                        <div class="result-content">${data.error}</div>
-                    </div>`;
-                    return;
-                }
-
-                if (data.results.length === 0) {
-                    resultsDiv.innerHTML = `<div class="result-item">
-                        <div class="result-title">No results found</div>
-                        <div class="result-content">Try a different search query</div>
-                    </div>`;
-                    return;
-                }
-
-                resultsDiv.innerHTML = data.results.map(result => `
-                    <div class="result-item">
-                        <div class="result-title">Pattern: ${result._source?.pattern || result.pattern}</div>
-                        <div class="result-content">Example: ${result._source?.example || result.example || 'N/A'}</div>
-                        ${result._source?.raw_event ? `<div class="result-content">Raw Event: ${result._source.raw_event}</div>` : ''}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div id="resultSection" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Query Results</h3>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-primary active" onclick="showView('table')">Table View</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="showView('chart')">Chart View</button>
+                        <button type="button" class="btn btn-outline-primary" onclick="showView('map')">Geo Map</button>
                     </div>
-                `).join('');
+                </div>
+                
+                <!-- Table View -->
+                <div id="tableView">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="mb-0">Columns</h5>
+                                    <small class="text-muted">Click for column statistics</small>
+                                </div>
+                                <div class="card-body p-0">
+                                    <ul id="columnList" class="list-group list-group-flush">
+                                        <!-- Column names will be added here -->
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-9">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-bordered">
+                                    <thead id="resultHeader"></thead>
+                                    <tbody id="resultBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3">
+                                <button class="btn btn-outline-secondary btn-sm" onclick="exportResults('csv')">Export CSV</button>
+                                <button class="btn btn-outline-secondary btn-sm" onclick="exportResults('json')">Export JSON</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chart View -->
+                <div id="chartView" style="display: none;">
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label for="chartType" class="form-label">Chart Type</label>
+                            <select class="form-select" id="chartType" onchange="updateChart()">
+                                <option value="bar">Bar Chart</option>
+                                <option value="line">Line Chart</option>
+                                <option value="pie">Pie Chart</option>
+                                <option value="area">Area Chart</option>
+                                <option value="scatter">Scatter Plot</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="xAxis" class="form-label">X-Axis</label>
+                            <select class="form-select" id="xAxis" onchange="updateChart()"></select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="yAxis" class="form-label">Y-Axis</label>
+                            <select class="form-select" id="yAxis" onchange="updateChart()"></select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="aggregation" class="form-label">Aggregation</label>
+                            <select class="form-select" id="aggregation" onchange="updateChart()">
+                                <option value="count">Count</option>
+                                <option value="sum">Sum</option>
+                                <option value="avg">Average</option>
+                                <option value="min">Minimum</option>
+                                <option value="max">Maximum</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="resultChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Map View -->
+                <div id="mapView" style="display: none;">
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label for="latField" class="form-label">Latitude Field</label>
+                            <select class="form-select" id="latField" onchange="updateMap()"></select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="lngField" class="form-label">Longitude Field</label>
+                            <select class="form-select" id="lngField" onchange="updateMap()"></select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="markerSize" class="form-label">Marker Size Field</label>
+                            <select class="form-select" id="markerSize" onchange="updateMap()">
+                                <option value="">None</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="markerColor" class="form-label">Marker Color Field</label>
+                            <select class="form-select" id="markerColor" onchange="updateMap()">
+                                <option value="">None</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="map"></div>
+                </div>
+            </div>
+            <div id="errorSection" class="alert alert-danger" style="display: none;"></div>
+        </div>
+    </div>
+</div>
 
-                if (data.using_fallback) {
-                    const warningBanner = document.createElement('div');
-                    warningBanner.className = 'warning-banner';
-                    warningBanner.innerHTML = `
-                        <span class="warning-icon">⚠️</span>
-                        <span>Using fallback storage. Some features may be limited.</span>
-                    `;
-                    resultsDiv.insertBefore(warningBanner, resultsDiv.firstChild);
-                }
-            })
-            .catch(error => {
-                resultsDiv.innerHTML = `<div class="result-item">
-                    <div class="result-title">Error</div>
-                    <div class="result-content">${error.message}</div>
-                </div>`;
-            });
+<!-- Save Query Modal -->
+<div class="modal fade" id="saveQueryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Save Query</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="saveQueryForm">
+                    <div class="mb-3">
+                        <label for="queryName" class="form-label">Query Name</label>
+                        <input type="text" class="form-control" id="queryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="queryDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="queryDescription" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="saveType" class="form-label">Save As</label>
+                        <select class="form-select" id="saveType" onchange="toggleSaveOptions()">
+                            <option value="query">Saved Query</option>
+                            <option value="alert">Alert</option>
+                            <option value="report">Report</option>
+                            <option value="dashboard">Dashboard Widget</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Alert Options -->
+                    <div id="alertOptions" style="display: none;">
+                        <div class="mb-3">
+                            <label for="alertThreshold" class="form-label">Threshold</label>
+                            <input type="number" class="form-control" id="alertThreshold">
+                        </div>
+                        <div class="mb-3">
+                            <label for="alertCondition" class="form-label">Condition</label>
+                            <select class="form-select" id="alertCondition">
+                                <option value="greater_than">Greater Than</option>
+                                <option value="less_than">Less Than</option>
+                                <option value="equals">Equals</option>
+                                <option value="not_equals">Not Equals</option>
+                            </select>
+            </div>
+                        <div class="mb-3">
+                            <label for="alertFrequency" class="form-label">Check Frequency (minutes)</label>
+                            <input type="number" class="form-control" id="alertFrequency" value="15">
+            </div>
+        </div>
+
+                    <!-- Report Options -->
+                    <div id="reportOptions" style="display: none;">
+                        <div class="mb-3">
+                            <label for="reportSchedule" class="form-label">Schedule</label>
+                            <select class="form-select" id="reportSchedule">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly">Monthly</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="reportFormat" class="form-label">Format</label>
+                            <select class="form-select" id="reportFormat">
+                                <option value="pdf">PDF</option>
+                                <option value="excel">Excel</option>
+                                <option value="csv">CSV</option>
+                            </select>
+                        </div>
+        </div>
+
+                    <!-- Dashboard Options -->
+                    <div id="dashboardOptions" style="display: none;">
+                        <div class="mb-3">
+                            <label for="dashboardLayout" class="form-label">Layout</label>
+                            <select class="form-select" id="dashboardLayout">
+                                <option value="full">Full Width</option>
+                                <option value="half">Half Width</option>
+                                <option value="third">One Third</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="refreshInterval" class="form-label">Refresh Interval (seconds)</label>
+                            <input type="number" class="form-control" id="refreshInterval" value="300">
+                        </div>
+                        <div class="mb-3">
+                            <label for="defaultVisualization" class="form-label">Default Visualization</label>
+                            <select class="form-select" id="defaultVisualization">
+                                <option value="table">Table</option>
+                                <option value="bar">Bar Chart</option>
+                                <option value="line">Line Chart</option>
+                                <option value="pie">Pie Chart</option>
+                                <option value="map">Geo Map</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveQuery()">Save Query</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- CodeMirror -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/sql/sql.min.js"></script>
+
+    <script>
+let editor;
+let currentData = null;
+let currentChart = null;
+let map = null;
+
+function showAlert(type, message, duration = 5000) {
+    const alertContainer = document.getElementById('alertContainer');
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-float alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    alertContainer.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        alertDiv.classList.remove('show');
+        setTimeout(() => alertDiv.remove(), 300);
+    }, duration);
+}
+
+function setLoading(element, isLoading) {
+    if (isLoading) {
+        element.classList.add('loading');
+        if (element.tagName === 'BUTTON') {
+            element.disabled = true;
         }
+    } else {
+        element.classList.remove('loading');
+        if (element.tagName === 'BUTTON') {
+            element.disabled = false;
+        }
+    }
+}
 
-        // Search on Enter key (Ctrl+Enter or Cmd+Enter)
-        document.getElementById('queryInput').addEventListener('keydown', function(e) {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                searchData();
-                e.preventDefault();
-            }
+async function loadIndices() {
+    try {
+        const response = await fetch('/api/admin/indices');
+        if (!response.ok) throw new Error('Failed to fetch indices');
+        
+        const data = await response.json();
+        const indexSelect = document.getElementById('indexSelect');
+        
+        // Clear existing options except the first one
+        indexSelect.innerHTML = '<option value="">Select Index</option>';
+        
+        // Add new options
+        data.indices.forEach(index => {
+            const option = document.createElement('option');
+            option.value = index.name;
+            option.textContent = index.name;
+            indexSelect.appendChild(option);
         });
+    } catch (error) {
+        console.error('Error loading indices:', error);
+        showAlert('danger', 'Failed to load indices');
+    }
+}
+
+function clearQuery() {
+    editor.setValue('');
+    document.getElementById('resultsSection').style.display = 'none';
+}
+
+async function executeQuery() {
+    const query = editor.getValue();
+    const language = document.getElementById('queryLanguage').value;
+    const indexName = document.getElementById('indexName').value;
+    
+    if (!query) {
+        showAlert('warning', 'Please enter a query');
+        return;
+    }
+    
+    if (language === 'dsl' && !indexName) {
+        showAlert('warning', 'Please select an index for DSL queries');
+                    return;
+                }
+
+    showLoading();
+    
+    try {
+        const response = await fetch('/execute_sql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, language, index_name: indexName })
+        });
+        
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.error || 'Query execution failed');
+        }
+        
+        currentData = result.data;
+        displayResults(result.data);
+        showAlert('success', 'Query executed successfully');
+    } catch (error) {
+        console.error('Error executing query:', error);
+        showAlert('danger', error.message || 'Failed to execute query');
+    } finally {
+        hideLoading();
+    }
+}
+
+function displayResults(data) {
+    if (!data || !data.schema || !data.datarows) {
+        showAlert('warning', 'No results to display');
+        document.getElementById('resultSection').style.display = 'none';
+                    return;
+                }
+
+    // Show result section
+    document.getElementById('resultSection').style.display = 'block';
+    document.getElementById('errorSection').style.display = 'none';
+    
+    // Update column list
+    updateColumnList(data.schema);
+    
+    // Update table view
+    updateTableView(data);
+    
+    // Update visualization options
+    updateVisualizationOptions(data.schema);
+    
+    // Show table view by default
+    showView('table');
+}
+
+function updateColumnList(schema) {
+    const columnList = document.getElementById('columnList');
+    columnList.innerHTML = '';
+    
+    schema.forEach(column => {
+        const li = document.createElement('li');
+        li.className = 'list-group-item column-stats';
+        li.dataset.column = column.name;
+        li.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${column.name}</strong>
+                    <br>
+                    <small class="text-muted">${column.type}</small>
+                </div>
+                <i class="bi bi-info-circle"></i>
+                    </div>
+        `;
+        columnList.appendChild(li);
+    });
+}
+
+function updateTableView(data) {
+    const header = document.getElementById('resultHeader');
+    const body = document.getElementById('resultBody');
+    
+    // Clear existing content
+    header.innerHTML = '';
+    body.innerHTML = '';
+    
+    // Add headers
+    const headerRow = document.createElement('tr');
+    data.schema.forEach(column => {
+        const th = document.createElement('th');
+        th.textContent = column.name;
+        headerRow.appendChild(th);
+    });
+    header.appendChild(headerRow);
+    
+    // Add data rows
+    data.datarows.forEach(row => {
+        const tr = document.createElement('tr');
+        row.forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell === null ? 'NULL' : cell;
+            tr.appendChild(td);
+        });
+        body.appendChild(tr);
+    });
+}
+
+function showView(view) {
+    // Hide all views
+    document.getElementById('tableView').style.display = 'none';
+    document.getElementById('chartView').style.display = 'none';
+    document.getElementById('mapView').style.display = 'none';
+    
+    // Show selected view
+    document.getElementById(`${view}View`).style.display = 'block';
+    
+    // Update visualization if needed
+    if (view === 'chart') {
+        updateChart();
+    } else if (view === 'map') {
+        updateMap();
+    }
+    
+    // Update active button
+    document.querySelectorAll('.btn-group .btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent.toLowerCase().includes(view)) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+function updateChart() {
+    if (!currentData || !currentChart) return;
+    
+    const chartType = document.getElementById('chartType').value;
+    const xAxis = document.getElementById('xAxis').value;
+    const yAxis = document.getElementById('yAxis').value;
+    const aggregation = document.getElementById('aggregation').value;
+    
+    // Process data for chart
+    const chartData = processDataForChart(currentData, xAxis, yAxis, aggregation);
+    
+    // Update or create chart
+    if (currentChart) {
+        currentChart.destroy();
+    }
+    
+    const ctx = document.getElementById('resultChart').getContext('2d');
+    currentChart = new Chart(ctx, {
+        type: chartType,
+        data: chartData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+function updateMap() {
+    if (!currentData || !map) return;
+    
+    const latField = document.getElementById('latField').value;
+    const lngField = document.getElementById('lngField').value;
+    const sizeField = document.getElementById('markerSize').value;
+    const colorField = document.getElementById('markerColor').value;
+    
+    // Clear existing markers
+    map.eachLayer(layer => {
+        if (layer instanceof L.Marker) {
+            map.removeLayer(layer);
+        }
+    });
+    
+    // Add markers for each data point
+    currentData.datarows.forEach(row => {
+        const lat = parseFloat(row[latField]);
+        const lng = parseFloat(row[lngField]);
+        
+        if (isNaN(lat) || isNaN(lng)) return;
+        
+        L.marker([lat, lng]).addTo(map);
+    });
+    
+    // Fit bounds to markers
+    const bounds = L.latLngBounds(currentData.datarows.map(row => [
+        parseFloat(row[latField]),
+        parseFloat(row[lngField])
+    ]));
+    map.fitBounds(bounds);
+}
+
+async function saveQuery() {
+    const name = document.getElementById('queryName').value;
+    const description = document.getElementById('queryDescription').value;
+    const saveType = document.getElementById('saveType').value;
+    const query = editor.getValue();
+    
+    if (!name || !query) {
+        showAlert('warning', 'Query name and query are required');
+        return;
+    }
+    
+    const data = {
+        name,
+        description,
+        query,
+        type: saveType,
+        language: document.getElementById('queryLanguage').value
+    };
+    
+    // Add type-specific options
+    if (saveType === 'alert') {
+        data.threshold = document.getElementById('alertThreshold').value;
+        data.condition = document.getElementById('alertCondition').value;
+        data.frequency = document.getElementById('alertFrequency').value;
+    } else if (saveType === 'report') {
+        data.schedule = document.getElementById('reportSchedule').value;
+        data.format = document.getElementById('reportFormat').value;
+    } else if (saveType === 'dashboard') {
+        data.layout = document.getElementById('dashboardLayout').value;
+        data.refresh_interval = document.getElementById('refreshInterval').value;
+        data.visualization = document.getElementById('defaultVisualization').value;
+    }
+    
+    try {
+        const response = await fetch('/save_query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', 'Query saved successfully');
+            bootstrap.Modal.getInstance(document.getElementById('saveQueryModal')).hide();
+        } else {
+            throw new Error(result.error || 'Failed to save query');
+        }
+    } catch (error) {
+        console.error('Error saving query:', error);
+        showAlert('danger', error.message || 'Failed to save query');
+    }
+}
+
+function toggleSaveOptions() {
+    const saveType = document.getElementById('saveType').value;
+    
+    // Hide all option sections
+    document.getElementById('alertOptions').style.display = 'none';
+    document.getElementById('reportOptions').style.display = 'none';
+    document.getElementById('dashboardOptions').style.display = 'none';
+    
+    // Show selected section
+    if (saveType === 'alert') {
+        document.getElementById('alertOptions').style.display = 'block';
+    } else if (saveType === 'report') {
+        document.getElementById('reportOptions').style.display = 'block';
+    } else if (saveType === 'dashboard') {
+        document.getElementById('dashboardOptions').style.display = 'block';
+    }
+}
+
+function exportResults(format) {
+    if (!currentData) return;
+    
+    if (format === 'csv') {
+        const csv = convertToCSV(currentData);
+        downloadFile(csv, 'query_results.csv', 'text/csv');
+    } else if (format === 'json') {
+        const json = JSON.stringify(currentData, null, 2);
+        downloadFile(json, 'query_results.json', 'application/json');
+    }
+}
+
+function convertToCSV(data) {
+    const headers = data.schema.map(col => col.name).join(',');
+    const rows = data.datarows.map(row => row.join(','));
+    return [headers, ...rows].join('\n');
+}
+
+function downloadFile(content, filename, type) {
+    const blob = new Blob([content], { type });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+}
+
+function showError(message) {
+    const errorSection = document.getElementById('errorSection');
+    errorSection.textContent = message;
+    errorSection.style.display = 'block';
+    document.getElementById('resultSection').style.display = 'none';
+}
+
+function showSuccess(message) {
+    // Implement toast or other success notification
+    console.log('Success:', message);
+}
+
+function showLoading() {
+    document.querySelector('button[type="submit"]').classList.add('loading');
+}
+
+function hideLoading() {
+    document.querySelector('button[type="submit"]').classList.remove('loading');
+}
+
+function hideResults() {
+    document.getElementById('resultSection').style.display = 'none';
+    document.getElementById('errorSection').style.display = 'none';
+}
+
+// Helper function to process data for charts
+function processDataForChart(data, xField, yField, aggregation) {
+    // Implementation depends on your data structure and requirements
+    // This is a basic implementation
+    return {
+        labels: data.datarows.map(row => row[xField]),
+        datasets: [{
+            label: yField,
+            data: data.datarows.map(row => row[yField])
+        }]
+    };
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize CodeMirror
+    editor = CodeMirror.fromTextArea(document.getElementById('queryEditor'), {
+        mode: 'text/x-sql',
+        theme: 'monokai',
+        lineNumbers: true,
+        autoCloseBrackets: true,
+        matchBrackets: true,
+        indentUnit: 4,
+        lineWrapping: true
+    });
+
+    // Set default query
+    editor.setValue('SELECT * FROM pa_logs LIMIT 10');
+
+    // Initialize map
+    map = L.map('map').setView([0, 0], 2);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Add event listeners
+    document.getElementById('queryLanguage').addEventListener('change', updateQueryInterface);
+    initializeEventListeners();
+});
+
+function initializeEventListeners() {
+    // Add listeners for save options
+    document.getElementById('saveType').addEventListener('change', toggleSaveOptions);
+    
+    // Add listeners for column statistics
+    document.getElementById('columnList').addEventListener('click', function(e) {
+        if (e.target.classList.contains('column-stats')) {
+            showColumnStats(e.target.dataset.column);
+        }
+    });
+}
+
+function updateQueryInterface() {
+    const language = document.getElementById('queryLanguage').value;
+    const indexContainer = document.getElementById('indexContainer');
+    const dslHelpText = document.getElementById('dslHelpText');
+    
+    // Update CodeMirror mode
+    editor.setOption('mode', language === 'sql' ? 'text/x-sql' : 'text/plain');
+    
+    // Show/hide index input for DSL queries
+    indexContainer.style.display = language === 'dsl' ? 'block' : 'none';
+    dslHelpText.style.display = language === 'dsl' ? 'block' : 'none';
+    
+    // Load appropriate sample query
+    loadSampleQuery();
+}
+
+function loadSampleQuery() {
+    const language = document.getElementById('queryLanguage').value;
+    let sampleQuery = '';
+    
+    switch (language) {
+        case 'sql':
+            sampleQuery = 'SELECT * FROM pa_logs\nWHERE timestamp >= NOW() - INTERVAL 1 DAY\nLIMIT 100';
+            break;
+        case 'ppl':
+            sampleQuery = 'source = pa_logs | where timestamp >= NOW() - 1d | fields timestamp, message, level | limit 100';
+            break;
+        case 'dsl':
+            sampleQuery = '{\n  "query": {\n    "range": {\n      "timestamp": {\n        "gte": "now-1d"\n      }\n    }\n  },\n  "size": 100\n}';
+            break;
+    }
+    
+    editor.setValue(sampleQuery);
+}
+
+function showColumnStats(column) {
+    // Implement column statistics display logic
+    console.log('Column statistics for:', column);
+}
+
+function updateVisualizationOptions(schema) {
+    // Implement visualization options update logic
+    console.log('Updating visualization options with schema:', schema);
+}
     </script>
-</body>
-</html> 
+{% endblock %} 

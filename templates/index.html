@@ -1,6 +1,25 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .input-group {
+        flex-wrap: nowrap;
+    }
+    
+    .input-group select,
+    .input-group input[type="text"] {
+        min-width: 200px;
+    }
+    
+    .input-group .form-select {
+        flex: 1 1 auto;
+    }
+    
+    .input-group .btn {
+        flex: 0 0 auto;
+    }
+</style>
+
 <div class="container-fluid">
     <div class="content-wrapper">
         <!-- Header -->
@@ -9,13 +28,21 @@
                 <i class="bi bi-file-earmark-plus"></i> Add Data
                 <small class="text-muted">Choose your data source</small>
             </h1>
-    </div>
+            <a href="/search" class="btn btn-primary">
+                <i class="bi bi-search"></i> Search Data
+            </a>
+        </div>
     
         <!-- Data Source Options (Tabs) -->
         <ul class="nav nav-tabs mb-3" id="addDataTabs" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload-pane" type="button" role="tab" aria-controls="upload-pane" aria-selected="true">
                     <i class="bi bi-upload"></i> File Upload
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="aws-tab" data-bs-toggle="tab" data-bs-target="#aws-pane" type="button" role="tab" aria-controls="aws-pane" aria-selected="false">
+                    <i class="bi bi-cloud"></i> AWS CloudTrail
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -52,30 +79,35 @@
                             <form id="uploadForm" enctype="multipart/form-data">
                                 <div class="mb-3">
                                     <label for="targetIndex" class="form-label">Target Index</label>
-                                    <div class="input-group">
-                                        <select class="form-select" id="targetIndex" required>
-                                            <option value="">Select an index...</option>
-                                        </select>
-                                        <button class="btn btn-outline-secondary" type="button" id="refreshIndices">
-                                            <i class="bi bi-arrow-clockwise"></i>
-                                        </button>
-                                        <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
-                                            <i class="bi bi-plus-lg"></i> New Index
-                                        </button>
-                                    </div>
-                                    <div class="form-text">Choose the index where the data will be stored</div>
+                                    <input type="text" class="form-control" id="targetIndex" name="target_index" list="indexOptions" required>
+                                    <datalist id="indexOptions">
+                                        <option value="aws">AWS Logs</option>
+                                        <option value="cloudtrail">CloudTrail</option>
+                                        <option value="logs">General Logs</option>
+                                        <option value="security_events">Security Events</option>
+                                    </datalist>
+                                    <div class="form-text">Enter the name of the index where data will be stored</div>
                                 </div>
                                 <div class="mb-3">
-                                    <label for="uploadDatatype" class="form-label">Data Type</label>
-                                    <input type="text" class="form-control" id="uploadDatatype" required 
-                                           placeholder="e.g., apache_logs, system_logs, application_logs">
-                                    <div class="form-text">A unique identifier for this type of data</div>
+                                    <label for="datatype" class="form-label">Data Type</label>
+                                    <input type="text" class="form-control" id="datatype" name="datatype" list="datatypeOptions" required>
+                                    <datalist id="datatypeOptions">
+                                        <option value="aws_logs">AWS Logs</option>
+                                        <option value="cloud_logs">Cloud Logs</option>
+                                        <option value="firewall_logs">Firewall Logs</option>
+                                        <option value="application_logs">Application Logs</option>
+                                        <option value="system_logs">System Logs</option>
+                                    </datalist>
+                                    <div class="form-text">Enter the type of data being uploaded</div>
                                 </div>
                                 <div class="mb-3">
                                     <label for="logFile" class="form-label">Log File</label>
-                                    <input type="file" id="logFile" class="form-control" accept=".csv, .json" required>
+                                    <input type="file" id="logFile" name="file" class="form-control" accept=".csv, .json" required>
                                 </div>
-                                <button type="submit" class="btn btn-primary">Upload and Analyze</button>
+                                <button type="submit" class="btn btn-primary" id="uploadBtn">Upload and Analyze</button>
+                                <div class="spinner-border text-primary d-none" id="uploadSpinner" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
                             </form>
                             <div id="uploadStatus" class="alert alert-info mt-3" style="display: none;"></div>
                         </div>
@@ -121,6 +153,37 @@
                     </div>
                 </div>
 
+            <!-- AWS CloudTrail Pane -->
+            <div class="tab-pane fade" id="aws-pane" role="tabpanel" aria-labelledby="aws-tab">
+                <h4>Upload AWS CloudTrail Data</h4>
+                <p>Directly upload AWS CloudTrail data to the OpenSearch index.</p>
+                <form id="awsUploadForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="awsTargetIndex" class="form-label">Target Index</label>
+                        <input type="text" class="form-control" id="awsTargetIndex" name="target_index" value="aws" readonly>
+                        <div class="form-text">Index name for AWS CloudTrail data</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="awsDatatype" class="form-label">Data Type</label>
+                        <input type="text" class="form-control" id="awsDatatype" name="datatype" value="aws_logs" readonly>
+                        <div class="form-text">Type of AWS data being uploaded</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="awsLogFile" class="form-label">CloudTrail JSON File</label>
+                        <input type="file" id="awsLogFile" name="file" class="form-control" accept=".json" required>
+                        <div class="form-text">Select a CloudTrail JSON file</div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="awsUploadBtn">
+                        Upload CloudTrail Data
+                    </button>
+                    <div class="spinner-border text-primary d-none" id="awsUploadSpinner" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </form>
+                <div id="awsUploadStatus" class="alert mt-3" style="display: none;"></div>
+                <div id="awsQueryOptions" class="mt-3"></div>
+            </div>
+
             <!-- REST API Collector Pane -->
             <div class="tab-pane fade" id="rest-pane" role="tabpanel" aria-labelledby="rest-tab">
                 <h4>Configure REST API Collector</h4>
@@ -129,17 +192,12 @@
                     <div class="mb-3">
                         <label for="restTargetIndex" class="form-label">Target Index</label>
                         <div class="input-group">
-                            <select class="form-select" id="restTargetIndex" required>
-                                <option value="">Select an index...</option>
-                            </select>
-                            <button class="btn btn-outline-secondary" type="button" onclick="loadIndices('restTargetIndex')">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
+                            <input type="text" class="form-control" id="restTargetIndex" required placeholder="Enter index name">
                             <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
                                 <i class="bi bi-plus-lg"></i> New Index
                             </button>
                         </div>
-                        <div class="form-text">Choose the index where the data will be stored</div>
+                        <div class="form-text">Enter the name of the index where data will be stored</div>
                     </div>
                      <div class="row">
                         <div class="col-md-6 mb-3">
@@ -186,17 +244,12 @@
                         <div class="col-md-6 mb-3">
                             <label for="syslogTargetIndex" class="form-label">Target Index</label>
                             <div class="input-group">
-                                <select class="form-select" id="syslogTargetIndex" required>
-                                    <option value="">Select an index...</option>
-                                </select>
-                                <button class="btn btn-outline-secondary" type="button" onclick="loadIndices('syslogTargetIndex')">
-                                    <i class="bi bi-arrow-clockwise"></i>
-                                </button>
+                                <input type="text" class="form-control" id="syslogTargetIndex" required placeholder="Enter index name">
                                 <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
                                     <i class="bi bi-plus-lg"></i> New Index
                                 </button>
                             </div>
-                            <div class="form-text">Choose the index where the data will be stored</div>
+                            <div class="form-text">Enter the name of the index where data will be stored</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="syslogPort" class="form-label">Listen Port</label>
@@ -235,17 +288,12 @@
                         <div class="col-md-6 mb-3">
                             <label for="hecTargetIndex" class="form-label">Target Index</label>
                             <div class="input-group">
-                                <select class="form-select" id="hecTargetIndex" required>
-                                    <option value="">Select an index...</option>
-                                </select>
-                                <button class="btn btn-outline-secondary" type="button" onclick="loadIndices('hecTargetIndex')">
-                                    <i class="bi bi-arrow-clockwise"></i>
-                                </button>
+                                <input type="text" class="form-control" id="hecTargetIndex" required placeholder="Enter index name">
                                 <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
                                     <i class="bi bi-plus-lg"></i> New Index
                                 </button>
                             </div>
-                            <div class="form-text">Choose the index where the data will be stored</div>
+                            <div class="form-text">Enter the name of the index where data will be stored</div>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="hecPort" class="form-label">Listen Port</label>
@@ -292,17 +340,12 @@
                      <div class="mb-3">
                         <label for="dbTargetIndex" class="form-label">Target Index</label>
                         <div class="input-group">
-                            <select class="form-select" id="dbTargetIndex" required>
-                                <option value="">Select an index...</option>
-                            </select>
-                            <button class="btn btn-outline-secondary" type="button" onclick="loadIndices('dbTargetIndex')">
-                                <i class="bi bi-arrow-clockwise"></i>
-                            </button>
+                            <input type="text" class="form-control" id="dbTargetIndex" required placeholder="Enter index name">
                             <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#newIndexModal">
                                 <i class="bi bi-plus-lg"></i> New Index
                             </button>
                         </div>
-                        <div class="form-text">Choose the index where the data will be stored</div>
+                        <div class="form-text">Enter the name of the index where data will be stored</div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -399,6 +442,9 @@
     </div>
 </div>
 
+<!-- After upload results -->
+<div id="queryOptions" class="mt-3"></div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -413,28 +459,56 @@ let itemsPerPage = 10;
 let patterns = [];
 
 document.addEventListener('DOMContentLoaded', function() {
-    // Load indices for all dropdowns on page load
-    loadIndices('targetIndex');
-    loadIndices('restTargetIndex');
-    loadIndices('syslogTargetIndex');
+    console.log('DOM loaded, initializing event handlers');
     
-    // Add click handlers for refresh buttons
-    document.getElementById('refreshIndices').addEventListener('click', function() {
-        loadIndices('targetIndex');
-    });
+    // Regular file upload form handling
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            uploadFile();
+        });
+    }
     
-    // File Upload Form submission handler
-    document.getElementById('uploadForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        uploadFile();
-    });
+    // AWS CloudTrail upload button click handler
+    const awsUploadBtn = document.getElementById('awsUploadBtn');
+    if (awsUploadBtn) {
+        console.log('AWS upload button found, adding click handler');
+        awsUploadBtn.addEventListener('click', function() {
+            console.log('AWS upload button clicked');
+            uploadAwsCloudTrail();
+        });
+    } else {
+        console.error('AWS upload button not found in DOM');
+    }
+    
+    // Method selector for REST API
+    const apiMethod = document.getElementById('apiMethod');
+    if (apiMethod) {
+        apiMethod.addEventListener('change', function() {
+            const bodyContainer = document.getElementById('apiBodyContainer');
+            if (bodyContainer) {
+                bodyContainer.style.display = this.value === 'POST' ? 'block' : 'none';
+            }
+        });
+    }
+    
+    // Load indices for all dropdowns on page load - REMOVED
+    // loadIndices('targetIndex');
+    // loadIndices('restTargetIndex');
+    // loadIndices('syslogTargetIndex');
+    
+    // Add click handlers for refresh buttons - REMOVED
+    // document.getElementById('refreshIndices').addEventListener('click', function() {
+    //     loadIndices('targetIndex');
+    // });
     
     // REST API Collector form handler
     document.getElementById('restCollectorForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const targetIndex = document.getElementById('restTargetIndex').value;
         if (!targetIndex) {
-            showToast('Please select a target index', 'error');
+            showToast('Please enter a target index', 'error');
             return;
         }
         startRestCollector(targetIndex);
@@ -537,85 +611,198 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('newIndexForm').reset();
         }
     });
+
+    // Handle index selection - REMOVED
+    // document.getElementById('targetIndexSelect').addEventListener('change', function() {
+    //     handleIndexSelection(this);
+    // });
+    
+    // Back button for manual entry - REMOVED
+    // document.getElementById('backToSelect').addEventListener('click', function() {
+    //     document.getElementById('indexSelectContainer').style.display = 'block';
+    //     document.getElementById('indexManualContainer').style.display = 'none';
+    //     document.getElementById('targetIndexSelect').value = '';
+    // });
+
+    // Populate predefined index options
+    const indexNameInput = document.getElementById('targetIndex');
+    const predefinedIndices = ['aws', 'cloudtrail', 'logs', 'security_events'];
+    
+    predefinedIndices.forEach(index => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = index;
+        if (indexNameInput.tagName === 'SELECT') {
+            indexNameInput.appendChild(option);
+        } else if (indexNameInput.tagName === 'INPUT' && indexNameInput.getAttribute('list')) {
+            // For datalist implementation
+            const dataList = document.getElementById(indexNameInput.getAttribute('list'));
+            if (dataList) {
+                const optionEl = document.createElement('option');
+                optionEl.value = index;
+                dataList.appendChild(optionEl);
+            }
+        }
+    });
+    
+    // Create datalist for index name input if it's a text input
+    if (indexNameInput.tagName === 'INPUT' && !indexNameInput.getAttribute('list')) {
+        const dataListId = 'indexNameList';
+        indexNameInput.setAttribute('list', dataListId);
+        
+        const dataList = document.createElement('datalist');
+        dataList.id = dataListId;
+        
+        predefinedIndices.forEach(index => {
+            const option = document.createElement('option');
+            option.value = index;
+            dataList.appendChild(option);
+        });
+        
+        indexNameInput.parentNode.appendChild(dataList);
+    }
 });
 
-function loadIndices(selectId) {
-    fetch('/api/admin/indices')
-        .then(response => response.json())
-        .then(data => {
-            const select = document.getElementById(selectId);
-            // Clear existing options except the first one
-            while (select.options.length > 1) {
-                select.remove(1);
-            }
-            
-            // Add new options
-            data.indices.forEach(index => {
-                const option = document.createElement('option');
-                option.value = index.name;
-                option.textContent = index.name;
-                select.appendChild(option);
-            });
-        })
-        .catch(error => {
-            console.error('Error loading indices:', error);
-        });
-}
+// Function handleIndexSelection - REMOVED
+// function handleIndexSelection(selectElement) {
+//     if (selectElement.value === 'manual') {
+//         document.getElementById('indexSelectContainer').style.display = 'none';
+//         document.getElementById('indexManualContainer').style.display = 'block';
+//         document.getElementById('targetIndex').focus();
+//     }
+// }
 
-// --- File Upload Workflow Functions --- 
+// Update loadIndices function - REMOVED
+// async function loadIndices() {
+//     try {
+//         const response = await fetch('/api/admin/indices');
+//         if (!response.ok) throw new Error('Failed to fetch indices');
+//         
+//         const data = await response.json();
+//         const indexSelect = document.getElementById('targetIndexSelect');
+//         
+//         // Clear existing options except the manual entry option
+//         indexSelect.innerHTML = `
+//             <option value="">Select an index...</option>
+//             <option value="manual">Enter manually...</option>
+//         `;
+//         
+//         // Add new options
+//         data.indices.forEach(index => {
+//             const option = document.createElement('option');
+//             option.value = index.name;
+//             option.textContent = index.name;
+//             indexSelect.appendChild(option);
+//         });
+//     } catch (error) {
+//         console.error('Error loading indices:', error);
+//         showToast('Failed to load indices', 'error');
+//     }
+// }
 
+// Function to handle file upload
 function uploadFile() {
-            const fileInput = document.getElementById('logFile');
-            const file = fileInput.files[0];
-    const uploadStatusDiv = document.getElementById('uploadStatus');
-    const datatype = document.getElementById('uploadDatatype').value;
+    console.log("Upload function called"); // Debug logging
+    const fileInput = document.getElementById('logFile');
+    const indexInput = document.getElementById('targetIndex');
+    const datatype = document.getElementById('datatype').value;
     
-            if (!file) {
-        showMessage('Please select a file first', 'danger', uploadStatusDiv);
-                return;
-            }
-
-            if (!datatype) {
-                showMessage('Please specify a data type', 'danger', uploadStatusDiv);
-                return;
-            }
-
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('datatype', datatype);
-
-    showMessage('Uploading and processing file...', 'info', uploadStatusDiv);
-    // Reset subsequent steps
-    document.getElementById('step2').style.display = 'none';
-    document.getElementById('step3').style.display = 'none';
-    document.getElementById('step4').style.display = 'none';
-    document.getElementById('patternsContainer').innerHTML = ''; 
-    document.getElementById('generateRegexBtn').style.display = 'none';
-
-    fetch('/upload', { method: 'POST', body: formData })
-    .then(response => response.json())
+    const targetIndex = indexInput.value.trim();
+    
+    if (!targetIndex) {
+        showAlert('warning', 'Please enter an index name');
+        return;
+    }
+    
+    if (!fileInput.files[0]) {
+        showAlert('warning', 'Please select a file to upload');
+        return;
+    }
+    
+    if (!datatype) {
+        showAlert('warning', 'Please enter a data type');
+        return;
+    }
+    
+    // Security: Client-side file size validation
+    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+    if (fileInput.files[0].size > maxSize) {
+        showAlert('warning', `File exceeds maximum size of ${(maxSize / (1024 * 1024)).toFixed(1)}MB`);
+        return;
+    }
+    
+    // Security: Client-side file type validation
+    const allowedExtensions = ['.json', '.csv'];
+    const fileName = fileInput.files[0].name;
+    const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+    
+    if (!allowedExtensions.includes(fileExt)) {
+        showAlert('warning', `Unsupported file type. Allowed extensions: ${allowedExtensions.join(', ')}`);
+        return;
+    }
+    
+    // Show upload status as loading
+    const uploadStatus = document.getElementById('uploadStatus');
+    uploadStatus.innerHTML = '<div class="spinner-border text-primary" role="status"></div> Uploading file...';
+    uploadStatus.style.display = 'block';
+    uploadStatus.className = 'alert alert-info mt-3';
+    
+    // Disable the submit button during upload
+    const submitBtn = document.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    
+    console.log("Creating FormData"); // Debug logging
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('target_index', targetIndex);
+    formData.append('datatype', datatype);
+    
+    console.log("Sending fetch request to /upload"); // Debug logging
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log("Response received:", response.status); // Debug logging
+        if (!response.ok) {
+            return response.json().then(data => {
+                throw new Error(data.error || `HTTP error ${response.status}`);
+            });
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log("Response data:", data); // Debug logging
+        
+        // Re-enable the submit button
+        if (submitBtn) submitBtn.disabled = false;
+        
         if (data.success) {
-            events = data.events;
-            columns = data.columns;
-            totalEvents = data.total_events;
-            currentPage = 1; // Reset page
+            let message = `Success! Processed ${data.total_events} events.`;
+            if (data.indexed) {
+                message += ` Data has been indexed to "${targetIndex}".`;
+            }
+            uploadStatus.className = 'alert alert-success mt-3';
+            uploadStatus.textContent = message;
             
-            showMessage(`Successfully processed ${data.valid_events} out of ${data.total_events} events.`, 'success', uploadStatusDiv);
-            populateColumnSelect(columns);
-            showEventsPage(events);
+            // Reset file input after successful upload
+            fileInput.value = '';
             
-            document.getElementById('step1').classList.remove('active');
-            document.getElementById('step1').classList.add('completed');
-            document.getElementById('step2').style.display = 'block';
-            document.getElementById('step2').classList.add('active');
-            document.getElementById('step3').style.display = 'block';
-                } else {
-            showMessage('Error: ' + data.error, 'danger', uploadStatusDiv);
+            // Update the UI with the loaded data
+            displayUploadResults(data);
+        } else {
+            uploadStatus.className = 'alert alert-danger mt-3';
+            uploadStatus.textContent = 'Error: ' + data.error;
         }
     })
     .catch(error => {
-        showMessage('Error: ' + error.message, 'danger', uploadStatusDiv);
+        console.error("Fetch error:", error); // Debug logging
+        
+        // Re-enable the submit button
+        if (submitBtn) submitBtn.disabled = false;
+        
+        uploadStatus.className = 'alert alert-danger mt-3';
+        uploadStatus.textContent = 'Error: ' + error.message;
     });
 }
 
@@ -1093,5 +1280,389 @@ function showToast(message, type = 'info') {
     toast.addEventListener('hidden.bs.toast', () => toast.remove());
 }
 
+// Add or update showAlert function
+function showAlert(type, message) {
+    // First check if we should use the existing showToast function
+    if (typeof showToast === 'function') {
+        showToast(message, type === 'warning' ? 'warning' : type === 'danger' ? 'error' : type);
+        return;
+    }
+    
+    // Fallback to basic alert
+    const uploadStatus = document.getElementById('uploadStatus');
+    if (uploadStatus) {
+        uploadStatus.textContent = message;
+        uploadStatus.className = `alert alert-${type} mt-3`;
+        uploadStatus.style.display = 'block';
+    } else {
+        alert(message);
+    }
+}
+
+// Function to display upload results
+function displayUploadResults(data) {
+    // Store events for later use
+    events = data.events;
+    totalEvents = data.total_events;
+    
+    // Show next step
+    document.getElementById('step2').style.display = 'block';
+    
+    // Update columns dropdown
+    updateColumnSelect(data.columns);
+    
+    // Display first page of events
+    displayEvents(1);
+    
+    // Add query options
+    const queryDiv = document.getElementById('queryOptions');
+    if (queryDiv) {
+        const targetIndex = document.getElementById('targetIndex').value.trim();
+        
+        // Create a "Query This Data" button that opens the search page
+        const queryBtn = document.createElement('a');
+        queryBtn.href = '/search';
+        queryBtn.className = 'btn btn-primary mt-3 me-2';
+        queryBtn.innerHTML = '<i class="bi bi-search"></i> Query This Data';
+        queryBtn.setAttribute('target', '_blank');
+        queryDiv.innerHTML = '';
+        queryDiv.appendChild(queryBtn);
+        
+        // Create a "View Index" button that opens the index management page
+        const viewIndexBtn = document.createElement('a');
+        viewIndexBtn.href = '/indexes';
+        viewIndexBtn.className = 'btn btn-secondary mt-3';
+        viewIndexBtn.innerHTML = '<i class="bi bi-table"></i> View Index Data';
+        viewIndexBtn.setAttribute('target', '_blank');
+        queryDiv.appendChild(viewIndexBtn);
+        
+        // Add index name as text
+        const indexInfo = document.createElement('div');
+        indexInfo.className = 'text-muted mt-2';
+        indexInfo.textContent = `Indexed to: ${targetIndex}`;
+        queryDiv.appendChild(indexInfo);
+    }
+}
+
+// Function to handle AWS CloudTrail direct upload
+function uploadAwsCloudTrail() {
+    console.log("AWS CloudTrail upload function called");
+    const fileInput = document.getElementById('awsLogFile');
+    const targetIndex = document.getElementById('awsTargetIndex').value;
+    const datatype = document.getElementById('awsDatatype').value;
+    const statusDiv = document.getElementById('awsUploadStatus');
+    const spinner = document.getElementById('awsUploadSpinner');
+    const uploadBtn = document.getElementById('awsUploadBtn');
+    
+    // Enhanced debugging - log all elements
+    console.log("Elements found:", {
+        fileInput: !!fileInput,
+        targetIndex: targetIndex, 
+        datatype: datatype,
+        statusDiv: !!statusDiv,
+        spinner: !!spinner,
+        uploadBtn: !!uploadBtn
+    });
+    
+    // Validation
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+        console.error("No file selected or file input not found");
+        statusDiv.textContent = 'Please select a CloudTrail JSON file';
+        statusDiv.className = 'alert alert-warning mt-3';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    // Security: Confirm AWS index value
+    if (targetIndex !== 'aws') {
+        console.error("Invalid target index for AWS upload");
+        statusDiv.textContent = 'Invalid target index for AWS upload. Must use "aws".';
+        statusDiv.className = 'alert alert-warning mt-3';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    // Security: Confirm AWS datatype
+    if (datatype !== 'aws_logs') {
+        console.error("Invalid datatype for AWS upload");
+        statusDiv.textContent = 'Invalid datatype for AWS upload. Must use "aws_logs".';
+        statusDiv.className = 'alert alert-warning mt-3';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    // Security: Client-side file size validation
+    const maxSize = 50 * 1024 * 1024; // 50MB in bytes
+    if (fileInput.files[0].size > maxSize) {
+        console.error("File too large:", fileInput.files[0].size);
+        statusDiv.textContent = `File exceeds maximum size of ${(maxSize / (1024 * 1024)).toFixed(1)}MB`;
+        statusDiv.className = 'alert alert-warning mt-3';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    // Security: Client-side file type validation
+    const fileName = fileInput.files[0].name;
+    const fileExt = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+    if (fileExt !== '.json') {
+        console.error("Invalid file type:", fileExt);
+        statusDiv.textContent = 'Invalid file type. AWS CloudTrail uploads must be JSON files.';
+        statusDiv.className = 'alert alert-warning mt-3';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    // Show loading indicators
+    statusDiv.innerHTML = 'Processing CloudTrail data...';
+    statusDiv.className = 'alert alert-info mt-3';
+    statusDiv.style.display = 'block';
+    uploadBtn.disabled = true;
+    spinner.classList.remove('d-none');
+    
+    // Create FormData object
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('target_index', targetIndex);
+    formData.append('datatype', datatype);
+    
+    console.log("FormData created with:", {
+        fileName: fileInput.files[0].name,
+        fileSize: fileInput.files[0].size,
+        fileType: fileInput.files[0].type,
+        targetIndex: targetIndex,
+        datatype: datatype
+    });
+    
+    // Send the request with detailed debugging
+    console.log("Sending fetch request to /upload endpoint");
+    fetch('/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        console.log("Response received:", {
+            status: response.status,
+            statusText: response.statusText,
+            headers: Object.fromEntries([...response.headers])
+        });
+        
+        // Check if response is ok before parsing JSON
+        if (!response.ok) {
+            console.error("Response not OK:", response.status, response.statusText);
+            throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        }
+        
+        return response.json().catch(error => {
+            console.error("Error parsing JSON response:", error);
+            throw new Error("Invalid response from server: " + error.message);
+        });
+    })
+    .then(data => {
+        console.log("Response data:", data);
+        uploadBtn.disabled = false;
+        spinner.classList.add('d-none');
+        
+        if (data.success) {
+            // Success handling
+            statusDiv.className = 'alert alert-success mt-3';
+            statusDiv.textContent = `Success! ${data.total_events} CloudTrail events have been indexed to the "${targetIndex}" index.`;
+            
+            // Reset file input after successful upload
+            fileInput.value = '';
+            
+            // Add query options
+            const queryDiv = document.getElementById('awsQueryOptions');
+            queryDiv.innerHTML = '';
+            
+            // Create a "View Data" button
+            const viewDataBtn = document.createElement('a');
+            viewDataBtn.href = '/indexes';
+            viewDataBtn.className = 'btn btn-primary mt-2 me-2';
+            viewDataBtn.innerHTML = '<i class="bi bi-table"></i> View Indexed Data';
+            viewDataBtn.setAttribute('target', '_blank');
+            queryDiv.appendChild(viewDataBtn);
+            
+            // Create a "Run Query" button
+            const queryBtn = document.createElement('a');
+            queryBtn.href = '/sql_query';
+            queryBtn.className = 'btn btn-secondary mt-2';
+            queryBtn.innerHTML = '<i class="bi bi-search"></i> Query CloudTrail Data';
+            queryBtn.setAttribute('target', '_blank');
+            queryDiv.appendChild(queryBtn);
+            
+            // Show a hint about the direct upload method
+            const hintDiv = document.createElement('div');
+            hintDiv.className = 'alert alert-info mt-3';
+            hintDiv.innerHTML = '<strong>Note:</strong> This method uploads directly to OpenSearch. CloudTrail data is now stored with the original structure in the "aws" index.';
+            queryDiv.appendChild(hintDiv);
+            
+        } else {
+            // Error handling
+            statusDiv.className = 'alert alert-danger mt-3';
+            statusDiv.textContent = 'Error: ' + (data.error || data.message || 'Unknown error occurred');
+            console.error("Upload failed:", data.error || data.message || 'Unknown error');
+        }
+    })
+    .catch(error => {
+        console.error("Fetch error:", error);
+        uploadBtn.disabled = false;
+        spinner.classList.add('d-none');
+        
+        statusDiv.className = 'alert alert-danger mt-3';
+        statusDiv.textContent = 'Error: ' + error.message;
+    });
+}
+
+    </script>
+    
+    <!-- AWS CloudTrail Upload Test Script -->
+    <script>
+        // Add this script to the page just before the end of the file
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('AWS CloudTrail test script loaded');
+            
+            // Function to create a test CloudTrail record
+            function createTestCloudTrailRecord() {
+                return {
+                    "Records": [
+                        {
+                            "eventVersion": "1.05",
+                            "eventTime": "2023-01-01T12:00:00Z",
+                            "eventSource": "test.amazonaws.com",
+                            "eventName": "TestEvent",
+                            "userIdentity": {
+                                "type": "IAMUser",
+                                "principalId": "TEST123456789",
+                                "arn": "arn:aws:iam::123456789012:user/testuser",
+                                "accountId": "123456789012",
+                                "accessKeyId": "AKIATESTKEY12345",
+                                "userName": "testuser"
+                            },
+                            "awsRegion": "us-east-1",
+                            "sourceIPAddress": "192.168.1.1",
+                            "requestParameters": {
+                                "param1": "value1",
+                                "param2": "value2"
+                            },
+                            "responseElements": {
+                                "result": "success"
+                            }
+                        }
+                    ]
+                };
+            }
+            
+            // Function to create a test CloudTrail Blob 
+            function createTestCloudTrailBlob() {
+                const testRecord = createTestCloudTrailRecord();
+                const jsonString = JSON.stringify(testRecord);
+                return new Blob([jsonString], {type: 'application/json'});
+            }
+            
+            // Add a button for testing directly with a generated sample
+            const awsUploadForm = document.getElementById('awsUploadForm');
+            if (awsUploadForm) {
+                // Add click event for the upload button
+                const awsUploadBtn = document.getElementById('awsUploadBtn');
+                if (awsUploadBtn) {
+                    console.log('Setting up AWS upload button click handler');
+                    awsUploadBtn.addEventListener('click', function() {
+                        console.log('AWS upload button clicked');
+                        uploadAwsCloudTrail();
+                    });
+                } else {
+                    console.error('AWS upload button not found');
+                }
+                
+                // Create a test button element
+                const testUploadBtn = document.createElement('button');
+                testUploadBtn.type = 'button';
+                testUploadBtn.className = 'btn btn-info mt-3';
+                testUploadBtn.innerText = 'Test with Sample Data';
+                testUploadBtn.addEventListener('click', function() {
+                    console.log('Test upload button clicked');
+                    
+                    const targetIndex = document.getElementById('awsTargetIndex').value;
+                    const datatype = document.getElementById('awsDatatype').value;
+                    const statusDiv = document.getElementById('awsUploadStatus');
+                    
+                    // Security: Validate the target index and datatype
+                    if (targetIndex !== 'aws') {
+                        console.error("Invalid target index for AWS upload");
+                        statusDiv.textContent = 'Invalid target index for AWS upload. Must use "aws".';
+                        statusDiv.className = 'alert alert-warning mt-3';
+                        statusDiv.style.display = 'block';
+                        return;
+                    }
+                    
+                    if (datatype !== 'aws_logs') {
+                        console.error("Invalid datatype for AWS upload");
+                        statusDiv.textContent = 'Invalid datatype for AWS upload. Must use "aws_logs".';
+                        statusDiv.className = 'alert alert-warning mt-3';
+                        statusDiv.style.display = 'block';
+                        return;
+                    }
+                    
+                    // Create a test file
+                    const testBlob = createTestCloudTrailBlob();
+                    const testFile = new File([testBlob], 'test-cloudtrail.json', {type: 'application/json'});
+                    
+                    // Create FormData object
+                    const formData = new FormData();
+                    formData.append('file', testFile);
+                    formData.append('target_index', targetIndex);
+                    formData.append('datatype', datatype);
+                    
+                    // Show status
+                    statusDiv.innerHTML = 'Uploading test CloudTrail data...';
+                    statusDiv.className = 'alert alert-info mt-3';
+                    statusDiv.style.display = 'block';
+                    
+                    // Send request to upload endpoint
+                    fetch('/upload', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(data => {
+                                throw new Error(data.error || `HTTP error ${response.status}`);
+                            });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log('Test upload response:', data);
+                        if (data.success) {
+                            statusDiv.className = 'alert alert-success mt-3';
+                            statusDiv.textContent = `Test successful! Sample CloudTrail data uploaded.`;
+                            
+                            // Add query options
+                            const queryDiv = document.getElementById('awsQueryOptions');
+                            queryDiv.innerHTML = '';
+                            
+                            // Create a "View Data" button
+                            const viewDataBtn = document.createElement('a');
+                            viewDataBtn.href = '/indexes';
+                            viewDataBtn.className = 'btn btn-primary mt-2 me-2';
+                            viewDataBtn.innerHTML = '<i class="bi bi-table"></i> View Test Data';
+                            viewDataBtn.setAttribute('target', '_blank');
+                            queryDiv.appendChild(viewDataBtn);
+                        } else {
+                            statusDiv.className = 'alert alert-danger mt-3';
+                            statusDiv.textContent = 'Error: ' + (data.error || data.message || 'Unknown error occurred');
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Test upload error:", error);
+                        statusDiv.className = 'alert alert-danger mt-3';
+                        statusDiv.textContent = 'Error: ' + error.message;
+                    });
+                });
+                
+                // Add the button to the form
+                awsUploadForm.appendChild(testUploadBtn);
+            }
+        });
     </script>
 {% endblock %} 

@@ -701,7 +701,7 @@ def upload_file():
                             records_list = json_data['Records']
                             df = pd.json_normalize(records_list)
                             logger.info(f"Processed CloudTrail Records into DataFrame with shape: {df.shape}")
-                        else:
+        else:
                             # Try direct conversion of the JSON structure
                             logger.info("No Records array found, trying direct conversion")
                             logger.info(f"Keys in JSON data: {list(json_data.keys())}")
